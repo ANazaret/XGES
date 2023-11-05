@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <vector>
 #include <tuple>
+#include "Insert.h"
 
 // Define the PDAGModification enum class.
 enum class PDAGModification {
@@ -77,5 +78,8 @@ public:
 
     void add_undirected_edge(int x, int y);
 
-    // Additional functions can be declared below.
+    bool is_insert_valid(const Insert &insert) const;
+
+    bool block_semi_directed_paths(int src, int dst, const std::set<int> &blocked_nodes) const;
+
 };

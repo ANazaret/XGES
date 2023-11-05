@@ -1,7 +1,9 @@
 //
 // Created by Achille Nazaret on 11/3/23.
 //
+#include <queue>
 #include "PDAG.h"
+#include "set_ops.h"
 
 PDAG::PDAG(int num_nodes) : num_nodes(num_nodes) {
     for (int i = 0; i < num_nodes; i++) {
@@ -91,12 +93,12 @@ bool PDAG::is_clique(const std::set<int> &nodes_subset) const {
 }
 
 bool PDAG::has_directed_edge(int x, int y) const {
-    const auto &children_set = children.at(x);
+    auto &children_set = children.at(x);
     return children_set.find(y) != children_set.end();
 }
 
 bool PDAG::has_undirected_edge(int x, int y) const {
-    const auto &neighbors_set = neighbors.at(x);
+    auto &neighbors_set = neighbors.at(x);
     return neighbors_set.find(y) != neighbors_set.end();
 }
 
@@ -153,3 +155,103 @@ void PDAG::add_undirected_edge(int x, int y) {
     graph_version++;
     modifications_history.emplace_back(PDAGModification::ADD_UNDIRECTED_EDGE, x, y);
 }
+
+/**
+ * Check if blocked_nodes block all semi-directed paths from src to dst.
+ *
+ * @param src The source node
+ * @param dst The destination node
+ * @param blocked_nodes The set of nodes that are blocked
+ * @return `true` if blocked_nodes block all semi-directed paths from src to dst, `false` otherwise.
+ */
+bool PDAG::block_semi_directed_paths(int src, int dst, const std::set<int> &blocked_nodes) const {
+    if (src == dst) {
+        return false;
+    }
+    // BFS search from y to x, using adjacent_reachable edges, avoiding blocked nodes
+    std::set<int> visited;
+    visited.insert(src);
+
+    std::queue<int> queue;
+    queue.push(src);
+
+    while (!queue.empty()) {
+        int node = queue.front();
+        queue.pop();
+        // it would be possible to not do a copy and not do find later (probably a minor optimization)
+        auto reachable = get_adjacent_reachable(node);
+
+        if (reachable.find(dst) != reachable.end()) {
+            return false;
+        }
+        // remove blocked nodes and already visited nodes
+        for (auto it = reachable.begin(); it != reachable.end();) {
+            if (blocked_nodes.find(*it) != blocked_nodes.end() || visited.find(*it) != visited.end()) {
+                it = reachable.erase(it);
+            } else {
+                ++it;
+            }
+        }
+        for (int n: reachable) {
+            queue.push(n);
+            visited.insert(n);
+        }
+    }
+    return true;
+}
+
+
+/**
+ * Verify if the insert is valid.
+ *
+ * Insert(x, y, T) is valid if and only if: [in approximate order of complexity]
+ *  1. x and y are not adjacent
+ *  2. T is a subset of Ne(y) \ Ad(x)
+ *  3. The score has not changed, i.e.  [Ne(y) ∩ Ad(x)] ∪ T ∪ Pa(y) has not changed
+ *  4. [Ne(y) ∩ Ad(x)] ∪ T is a clique (even if 3. hold, the clique might not be valid)
+ *  5. [Ne(y) ∩ Ad(x)] ∪ T block all semi-directed paths from y to x
+ *
+ * @param insert
+ * @return ??
+ */
+bool PDAG::is_insert_valid(const Insert &insert) const {
+    int x = insert.x;
+    int y = insert.y;
+    auto &T = insert.T;
+
+    // 1. x and y are not adjacent
+    auto &adjacent_x = adjacent.at(x);
+    if (adjacent_x.find(y) != adjacent_x.end()) {
+        return false;
+    }
+
+    // 2. T is a subset of Ne(y) \ Ad(x)
+    // <=> T is a subset of Ne(y) and T does not intersect Ad(x)
+    auto &neighbors_y = neighbors.at(y);
+    if (!is_subset(T, neighbors_y) || have_overlap(T, adjacent_x)) {
+        return false;
+    }
+
+    // 3. [Ne(y) ∩ Ad(x)] ∪ T ∪ Pa(y) has not changed
+    // <=> insert.effective_parents == [Ne(y) ∩ Ad(x)] ∪ T ∪ Pa(y)
+    auto ne_y_ad_x_T = neighbors_y;
+    // intersect effective_parents with Ad(x)
+    intersect_in_place(ne_y_ad_x_T, adjacent_x);
+    ne_y_ad_x_T.insert(T.begin(), T.end());
+    if (!equal_union(insert.effective_parents, ne_y_ad_x_T, parents.at(y))) {
+        return false;
+    }
+
+    // 4. [Ne(y) ∩ Ad(x)] ∪ T is a clique
+    if (!is_clique(ne_y_ad_x_T)) {
+        return false;
+    }
+
+    // 5. [Ne(y) ∩ Ad(x)] ∪ T block all semi-directed paths from y to x
+    if (!block_semi_directed_paths(y, x, ne_y_ad_x_T)) {
+        return false;
+    }
+
+    return true;
+}
+
