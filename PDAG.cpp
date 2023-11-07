@@ -255,3 +255,237 @@ bool PDAG::is_insert_valid(const Insert &insert) const {
     return true;
 }
 
+/**
+ * Apply the insert to the PDAG, and adapt the graph to remain a CPDAG.
+ *
+ * Insert(x, y, T) does:
+ *  1. insert the directed edge x → y
+ *  2. for each t ∈ T: orient the (previously undirected) edge between t and y as t → y
+ *
+ * @param insert
+ */
+void PDAG::apply_insert(const Insert &insert) {
+    int x = insert.x;
+    int y = insert.y;
+    auto &T = insert.T;
+
+
+
+    // Start: The graph is a CPDAG
+
+    // Case 1: T is not empty;
+    //  then x → y and each t → y will form a v-structure [remember t ∉ Ad(x)];
+    //  so the edges are directed (and we do not need to check them later).
+    if (!T.empty()) {
+
+        // 1. insert the directed edge x → y
+        add_directed_edge(x, y);
+
+        // 2. for each t ∈ T: orient the (previously undirected) edge between t and y as t → y
+        for (int t: T) {
+            remove_undirected_edge(t, y);
+            add_directed_edge(t, y);
+        }
+    } else {
+        // Case 2: T is empty;
+        //  then x → y is part of a v-structure if and only if Pa(y) \ Ad(x) ≠ ∅.
+        //  <==> ¬(Pa(y) ⊆ Ad(x))
+        if (!is_subset(parents.at(y), adjacent.at(x))) {
+            // actually we want to know the content of Pa(y) \ Ad(x)
+            // 1. insert the directed edge x → y
+            add_directed_edge(x, y);
+        } else {
+            // 2. insert the undirected edge x - y
+            add_undirected_edge(x, y);
+        }
+    }
+
+
+}
+
+/**
+ * Meek rule 1:  (z → x - y)  ⇒  (x → y)
+ *
+ * Assume that we have (x - y)
+ * Condition: Exists z such that
+ *  1. z → x
+ *  2. z not adjacent to y
+ */
+bool PDAG::is_oriented_by_meek_rule_1(int x, int y) const {
+    // 1. z → x
+    for (int z: parents.at(x)) {
+        // 2. z not adjacent to y
+        if (adjacent.at(z).find(y) == adjacent.at(z).end()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Meek rule 2: (x → z → y) ∧ (x - y)  ⇒  (x → y)
+ *
+ * Assume that we have (x - y)
+ * Condition: Exists z such that
+ *  1. x → z
+ *  2. z → y
+ */
+bool PDAG::is_oriented_by_meek_rule_2(int x, int y) const {
+    // 1. x → z
+    for (int z: children.at(x)) {
+        // 2. z → y
+        if (children.at(z).find(y) != children.at(z).end()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Meek rule 3: (x - z → y) ∧ (x - w → y) ∧ (x - y)  ⇒  (x → y)
+ *
+ * Assume that we have (x - y)
+ * Condition: Exists (z, w) such that
+ *  1. z - x and w - x
+ *  2. z → y and w → y
+ *  3. z ≠ w
+ *  4. z, w not adjacent
+ */
+bool PDAG::is_oriented_by_meek_rule_3(int x, int y) const {
+    // 1. z - x and w - x
+    auto candidates_z_w = neighbors.at(x);
+    // 2. z → y and w → y
+    intersect_in_place(candidates_z_w, parents.at(y));
+    for (auto candidate_z: candidates_z_w) {
+        for (auto candidate_w: candidates_z_w) {
+            // 3. z ≠ w
+            if (candidate_z >= candidate_w) {
+                continue;
+            }
+            // 4. z, w not adjacent
+            auto &adjacent_z = adjacent.at(candidate_z);
+            if (adjacent_z.find(candidate_w) == adjacent_z.end()) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/**
+ * Check if (x, y) is part of a v-structure.
+ *
+ * Condition: Exists z such that:
+ *  1. x → y
+ *  2. z → y
+ *  3. x ≠ z
+ *  4. z not adjacent to x.
+ *
+ * @param x
+ * @param y
+ * @return
+ */
+bool PDAG::is_part_of_v_structure(int x, int y) const {
+    auto &parents_y = parents.at(y);
+    //1. x → y
+    if (parents_y.find(x) == parents_y.end()) {
+        return false;
+    }
+    // 2. z → y
+    for (int z: parents_y) {
+        // 3. x ≠ z
+        if (z == x) {
+            continue;
+        }
+        // 4. z not adjacent to x.
+        if (adjacent.at(z).find(x) == adjacent.at(z).end()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Check the types of a list of edges.
+ *
+ * Each edge (x, y) in edges_to_check is directed if and only if one of the following holds:
+ * 1. x → y is part of a v-structure;
+ * 2.1 x → y is oriented by Meek rule 1;
+ * 2.2 x → y is oriented by Meek rule 2;
+ * 2.3. x → y is oriented by Meek rule 3;
+ *
+ * Otherwise, the edge is undirected.
+ *
+ * @param insert
+ */
+void PDAG::maintain_cpdag(EdgeQueueSet &edges_to_check, std::set<Edge> &changed_edges) {
+    // need to keep track of the modifications made to the graph
+
+    while (!edges_to_check.empty()) {
+        Edge edge = edges_to_check.pop();
+        int x = edge.x;
+        int y = edge.y;
+
+        if (edge.type == EdgeType::DIRECTED) {
+            // Check if the edge is still directed
+            if (is_part_of_v_structure(x, y) ||
+                is_oriented_by_meek_rule_1(x, y) ||
+                is_oriented_by_meek_rule_2(x, y) ||
+                is_oriented_by_meek_rule_3(x, y)) {
+                // The edge is still directed
+                continue;
+            }
+            // The edge is not directed anymore
+            remove_directed_edge(x, y);
+            add_undirected_edge(x, y);
+        } else {
+            // Check if the edge is now directed
+            if (is_oriented_by_meek_rule_1(x, y) ||
+                is_oriented_by_meek_rule_2(x, y) ||
+                is_oriented_by_meek_rule_3(x, y)) {
+                // The edge is now directed
+            } else if (is_oriented_by_meek_rule_1(y, x) ||
+                       is_oriented_by_meek_rule_2(y, x) ||
+                       is_oriented_by_meek_rule_3(y, x)) {
+                // The edge is now directed
+                std::swap(x, y);
+            } else {
+                // The edge is still undirected
+                continue;
+            }
+            remove_undirected_edge(x, y);
+            add_directed_edge(x, y);
+        }
+
+        // remove the edge with its old type if it was in the list of changed edges
+        changed_edges.erase(edge);
+        // Add the edge to the list of changed edges, with its new type
+        EdgeType new_type = edge.type == EdgeType::UNDIRECTED ? EdgeType::DIRECTED : EdgeType::UNDIRECTED;
+        changed_edges.insert({x, y, new_type});
+
+        // We have updated edge (x, y)
+        // We need to check the adjacent edges that might be affected by this update
+        for (int z: children.at(y)) {
+            if (x != z) edges_to_check.push_directed(y, z);
+        }
+        for (int z: parents.at(y)) {
+            if (x != z) edges_to_check.push_directed(z, y);
+        }
+        for (int z: children.at(x)) {
+            if (y != z) edges_to_check.push_directed(x, z);
+        }
+        // we do not need to add any (z, x) edges for z in parents.at(x)
+        for (int z: neighbors.at(x)) {
+            if (y != z) edges_to_check.push_undirected(x, z);
+        }
+        for (int z: neighbors.at(y)) {
+            if (x != z) edges_to_check.push_undirected(y, z);
+        }
+    }
+}
+
+
+// insert
+// i like the general maintain_cpdag function;
+// i should keep track of v-structured edges: not for now
+

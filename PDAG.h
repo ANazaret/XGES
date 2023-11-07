@@ -7,7 +7,9 @@
 #include <set>
 #include <unordered_map>
 #include <vector>
+#include <queue>
 #include <tuple>
+#include "EdgeQueueSet.h"
 #include "Insert.h"
 
 // Define the PDAGModification enum class.
@@ -81,5 +83,18 @@ public:
     bool is_insert_valid(const Insert &insert) const;
 
     bool block_semi_directed_paths(int src, int dst, const std::set<int> &blocked_nodes) const;
+
+    void apply_insert(const Insert &insert);
+
+    void maintain_cpdag(EdgeQueueSet &edges_to_check, std::set<Edge> &changed_edges);
+
+    bool is_oriented_by_meek_rule_1(int x, int y) const;
+
+    bool is_oriented_by_meek_rule_2(int x, int y) const;
+
+    bool is_oriented_by_meek_rule_3(int x, int y) const;
+
+    bool is_part_of_v_structure(int x, int y) const;
+
 
 };

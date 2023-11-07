@@ -6,3 +6,11 @@ set(CMAKE_CXX_STANDARD 23)
 add_executable(ges_cpp main.cpp
         PDAG.cpp
         PDAG.h)
+        PDAG.h
+        ScorerInterface.h
+        Insert.h
+        Insert.cpp
+        set_ops.h
+        set_ops.cpp
+        EdgeQueueSet.cpp
+        EdgeQueueSet.h
