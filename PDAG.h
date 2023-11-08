@@ -4,13 +4,13 @@
 
 #pragma once
 
-#include <set>
-#include <unordered_map>
-#include <vector>
-#include <queue>
-#include <tuple>
 #include "EdgeQueueSet.h"
 #include "Insert.h"
+#include <queue>
+#include <set>
+#include <tuple>
+#include <unordered_map>
+#include <vector>
 
 // Define the PDAGModification enum class.
 enum class PDAGModification {
@@ -97,4 +97,9 @@ public:
     bool is_part_of_v_structure(int x, int y) const;
 
 
+    const std::vector<int> &get_nodes() const;
+
+    std::set<int> get_neighbors_not_adjacent(int node_y, int node_x) const;
+
+    friend std::ostream &operator<<(std::ostream &os, const PDAG &obj);
 };

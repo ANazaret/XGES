@@ -1,7 +1,6 @@
 //
 // Created by Achille Nazaret on 11/3/23.
 //
-#include <queue>
 #include "PDAG.h"
 #include "set_ops.h"
 
@@ -59,6 +58,15 @@ std::set<int> PDAG::get_neighbors_adjacent(int node_y, int node_x) const {
     const auto &adjacent_set = get_adjacent(node_x);
     std::set_intersection(neighbors_set.begin(), neighbors_set.end(), adjacent_set.begin(),
                           adjacent_set.end(), std::inserter(result, result.begin()));
+    return result;
+}
+
+std::set<int> PDAG::get_neighbors_not_adjacent(int node_y, int node_x) const {
+    std::set<int> result;
+    const auto &neighbors_set = get_neighbors(node_y);
+    const auto &adjacent_set = get_adjacent(node_x);
+    std::set_difference(neighbors_set.begin(), neighbors_set.end(), adjacent_set.begin(), adjacent_set.end(),
+                        std::inserter(result, result.begin()));
     return result;
 }
 
@@ -194,6 +202,8 @@ bool PDAG::is_insert_valid(const Insert &insert) const {
     int x = insert.x;
     int y = insert.y;
     auto &T = insert.T;
+
+    // add version thingy
 
     // 1. x and y are not adjacent
     auto &adjacent_x = adjacent.at(x);
@@ -434,3 +444,11 @@ void PDAG::maintain_cpdag(EdgeQueueSet &edges_to_check, std::set<Edge> &changed_
 // i like the general maintain_cpdag function;
 // i should keep track of v-structured edges: not for now
 
+std::ostream &operator<<(std::ostream &os, const PDAG &obj) {
+    os << "PDAG: directed edges = {";
+    for (auto edge: obj.get_directed_edges()) { os << "(" << edge.first << "-->" << edge.second << "), "; }
+    os << "}, undirected edges = {";
+    for (auto edge: obj.get_undirected_edges()) { os << "(" << edge.first << "---" << edge.second << "), "; }
+    os << "}";
+    return os;
+}
