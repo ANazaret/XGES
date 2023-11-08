@@ -14,3 +14,5 @@ add_executable(ges_cpp main.cpp
         set_ops.cpp
         EdgeQueueSet.cpp
         EdgeQueueSet.h
+        BICScorer.cpp
+        BICScorer.h)
