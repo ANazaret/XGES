@@ -4,24 +4,26 @@
 
 #pragma once
 
-#include <set>
 #include "ScorerInterface.h"
+#include <iostream>
+#include <set>
 
 class Insert {
 public:
-    Insert(int x, int y, const std::set<int> &T);
-
-    double compute_score(const ScorerInterface &scorer);
+    Insert(int x, int y, const std::set<int> &T, double score, std::set<int> effective_parents);
 
     friend std::ostream &operator<<(std::ostream &os, const Insert &obj);
 
     friend class PDAG;
 
+    friend class XGES;
+
+    bool operator<(const Insert &rhs) const { return score < rhs.score; }
+
+
 private:
     int x, y;
     std::set<int> T;
-    std::set<int> effective_parents; // = [Ne(y) ∩ Ad(x)] ∪ T ∪ Pa(y)
+    std::set<int> effective_parents;// = [Ne(y) ∩ Ad(x)] ∪ T ∪ Pa(y)
     double score = 0;
 };
-
-
