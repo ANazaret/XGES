@@ -7,16 +7,14 @@
 #include <queue>
 #include <set>
 
-enum class EdgeType {
-    DIRECTED = 1,
-    UNDIRECTED = 2
-};
+enum class EdgeType { DIRECTED = 1, UNDIRECTED = 2 };
 
 struct Edge {
     int x, y;
     EdgeType type;
 
     bool operator<(const Edge &other) const {
+        // TODO: change to make undirected edges equal to their reverse
         if (x < other.x) return true;
         if (x > other.x) return false;
         if (y < other.y) return true;
@@ -29,6 +27,7 @@ class EdgeQueueSet {
 private:
     std::queue<Edge> edges_queue;
     std::set<Edge> edges_set;
+
 public:
     void push_directed(int x, int y);
 
@@ -38,4 +37,3 @@ public:
 
     bool empty() const;
 };
-

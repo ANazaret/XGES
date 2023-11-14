@@ -247,19 +247,24 @@ void PDAG::apply_insert(const Insert &insert) {
 
 
     // Start: The graph is a CPDAG
+    EdgeQueueSet edges_to_check;
+    std::set<Edge> changed_edges;
 
     // Case 1: T is not empty;
     //  then x → y and each t → y will form a v-structure [remember t ∉ Ad(x)];
     //  so the edges are directed (and we do not need to check them later).
     if (!T.empty()) {
-
         // 1. insert the directed edge x → y
         add_directed_edge(x, y);
+        add_edges_around(x, y, edges_to_check, true);
+        changed_edges.insert({x, y, EdgeType::DIRECTED});
 
         // 2. for each t ∈ T: orient the (previously undirected) edge between t and y as t → y
         for (int t: T) {
             remove_undirected_edge(t, y);
             add_directed_edge(t, y);
+            add_edges_around(t, y, edges_to_check, true);
+            changed_edges.insert({t, y, EdgeType::DIRECTED});
         }
     } else {
         // Case 2: T is empty;
@@ -269,10 +274,67 @@ void PDAG::apply_insert(const Insert &insert) {
             // actually we want to know the content of Pa(y) \ Ad(x)
             // 1. insert the directed edge x → y
             add_directed_edge(x, y);
+            edges_to_check.push_directed(x, y);
+            add_edges_around(x, y, edges_to_check, true);
+            changed_edges.insert({x, y, EdgeType::DIRECTED});
         } else {
             // 2. insert the undirected edge x - y
             add_undirected_edge(x, y);
+            edges_to_check.push_undirected(x, y);
+            add_edges_around(x, y, edges_to_check, false);
+            changed_edges.insert({x, y, EdgeType::UNDIRECTED});
         }
+    }
+
+    // now need to decide which edges to check,
+
+    // Transport to new contexts
+    // Transport to new perturbations
+    // but trained or not trained?
+    // cluster genes together
+    // where does the large width regime comes into play?
+    // what is the difference between the two regimes?
+    // what is the structure of the neural network? how do you get a causal graph Z
+
+
+    // i have added edge (x,y)
+    // i need to check the adjacent edges that might be affected by this update
+    // easy answer: all edges adjacent to x or y
+    // but i can do better
+    // If x → y, then don't need to update the edges going to x
+
+    maintain_cpdag(edges_to_check, changed_edges);
+
+    // End: The graph is a CPDAG
+    // print changed edges
+    std::cout << "changed_edges.size() = " << changed_edges.size() << std::endl;
+    for (auto edge: changed_edges) {
+        std::cout << edge.x << (edge.type == EdgeType::DIRECTED ? " → " : " - ") << edge.y << ", ";
+    }
+    std::cout << std::endl;
+}
+
+void PDAG::add_edges_around(int x, int y, EdgeQueueSet &edgeQueueSet, bool is_directed) {
+    for (int z: children.at(y)) {
+        if (x != z) edgeQueueSet.push_directed(y, z);
+    }
+    for (int z: parents.at(y)) {
+        if (x != z) edgeQueueSet.push_directed(z, y);
+    }
+    for (int z: children.at(x)) {
+        if (y != z) edgeQueueSet.push_directed(x, z);
+    }
+    // if is_directed, we do not need to add any (z, x) edges for z in parents.at(x)
+    if (!is_directed) {
+        for (int z: parents.at(x)) {
+            if (y != z) edgeQueueSet.push_directed(z, x);
+        }
+    }
+    for (int z: neighbors.at(x)) {
+        if (y != z) edgeQueueSet.push_undirected(x, z);
+    }
+    for (int z: neighbors.at(y)) {
+        if (x != z) edgeQueueSet.push_undirected(y, z);
     }
 }
 
@@ -413,29 +475,15 @@ void PDAG::maintain_cpdag(EdgeQueueSet &edges_to_check, std::set<Edge> &changed_
         }
 
         // remove the edge with its old type if it was in the list of changed edges
-        changed_edges.erase(edge);
+        changed_edges.erase(
+                edge);// TODO: if the edge is undirected, we need to check if (v,u) is in changed_edges
         // Add the edge to the list of changed edges, with its new type
         EdgeType new_type = edge.type == EdgeType::UNDIRECTED ? EdgeType::DIRECTED : EdgeType::UNDIRECTED;
         changed_edges.insert({x, y, new_type});
 
         // We have updated edge (x, y)
         // We need to check the adjacent edges that might be affected by this update
-        for (int z: children.at(y)) {
-            if (x != z) edges_to_check.push_directed(y, z);
-        }
-        for (int z: parents.at(y)) {
-            if (x != z) edges_to_check.push_directed(z, y);
-        }
-        for (int z: children.at(x)) {
-            if (y != z) edges_to_check.push_directed(x, z);
-        }
-        // we do not need to add any (z, x) edges for z in parents.at(x)
-        for (int z: neighbors.at(x)) {
-            if (y != z) edges_to_check.push_undirected(x, z);
-        }
-        for (int z: neighbors.at(y)) {
-            if (x != z) edges_to_check.push_undirected(y, z);
-        }
+        add_edges_around(x, y, edges_to_check, new_type == EdgeType::DIRECTED);
     }
 }
 

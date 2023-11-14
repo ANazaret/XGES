@@ -102,4 +102,6 @@ public:
     std::set<int> get_neighbors_not_adjacent(int node_y, int node_x) const;
 
     friend std::ostream &operator<<(std::ostream &os, const PDAG &obj);
+
+    void add_edges_around(int x, int y, EdgeQueueSet &edgeQueueSet, bool is_directed = false);
 };
