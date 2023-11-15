@@ -2,7 +2,7 @@
 // Created by Achille Nazaret on 11/4/23.
 //
 
-#include "Insert.h"
+#include "Operators.h"
 
 Insert::Insert(int x, int y, const std::set<int> &T, double score, std::set<int> effective_parents)
     : x(x), y(y), T(T), score(score), effective_parents(effective_parents) {}
@@ -13,5 +13,16 @@ std::ostream &operator<<(std::ostream &os, const Insert &obj) {
     os << "}, score = " << obj.score << ", effective_parents = {";
     for (auto p: obj.effective_parents) { os << p << ", "; }
     os << "}";
+    return os;
+}
+
+
+Delete::Delete(int x, int y, const std::set<int> &H, double score, std::set<int> effective_parents)
+    : x(x), y(y), H(H), score(score) {}
+
+std::ostream &operator<<(std::ostream &os, const Delete &obj) {
+    os << "Delete: x = " << obj.x << ", y = " << obj.y << ", H = {";
+    for (auto t: obj.H) { os << t << ", "; }
+    os << "}, score = " << obj.score;
     return os;
 }

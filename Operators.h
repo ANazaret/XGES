@@ -27,3 +27,24 @@ private:
     std::set<int> effective_parents;// = [Ne(y) ∩ Ad(x)] ∪ T ∪ Pa(y)
     double score = 0;
 };
+
+
+class Delete {
+public:
+    Delete(int x, int y, const std::set<int> &H, double score, std::set<int> effective_parents);
+
+    friend std::ostream &operator<<(std::ostream &os, const Delete &obj);
+
+    friend class PDAG;
+
+    friend class XGES;
+
+    bool operator<(const Delete &rhs) const { return score < rhs.score; }
+
+
+private:
+    int x, y;
+    std::set<int> H;
+    // std::set<int> effective_parents;// = [Ne(y) ∩ Ad(x)] ∪ T ∪ Pa(y)
+    double score = 0;
+};
