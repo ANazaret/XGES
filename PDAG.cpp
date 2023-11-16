@@ -152,7 +152,8 @@ void PDAG::add_undirected_edge(int x, int y) {
  * @param blocked_nodes The set of nodes that are blocked
  * @return `true` if blocked_nodes block all semi-directed paths from src to dst, `false` otherwise.
  */
-bool PDAG::block_semi_directed_paths(int src, int dst, const std::set<int> &blocked_nodes) const {
+bool PDAG::block_semi_directed_paths(int src, int dst, const std::set<int> &blocked_nodes,
+                                     bool ignore_direct_edge) const {
     if (src == dst) { return false; }
     // BFS search from y to x, using adjacent_reachable edges, avoiding blocked nodes
     std::set<int> visited;
@@ -167,7 +168,10 @@ bool PDAG::block_semi_directed_paths(int src, int dst, const std::set<int> &bloc
         // it would be possible to not do a copy and not do find later (probably a minor optimization)
         auto reachable = get_adjacent_reachable(node);
 
-        if (reachable.find(dst) != reachable.end()) { return false; }
+        if (reachable.find(dst) != reachable.end()) {
+            if (!(ignore_direct_edge && node == src)) { return false; }
+            reachable.erase(dst);
+        }
         // remove blocked nodes and already visited nodes
         for (auto it = reachable.begin(); it != reachable.end();) {
             if (blocked_nodes.find(*it) != blocked_nodes.end() || visited.find(*it) != visited.end()) {
@@ -198,16 +202,22 @@ bool PDAG::block_semi_directed_paths(int src, int dst, const std::set<int> &bloc
  * @param insert
  * @return ??
  */
-bool PDAG::is_insert_valid(const Insert &insert) const {
+bool PDAG::is_insert_valid(const Insert &insert, bool reverse) const {
     int x = insert.x;
     int y = insert.y;
     auto &T = insert.T;
 
     // add version thingy
 
-    // 1. x and y are not adjacent
     auto &adjacent_x = adjacent.at(x);
-    if (adjacent_x.find(y) != adjacent_x.end()) { return false; }
+    if (!reverse) {
+        // 1. x and y are not adjacent
+        if (adjacent_x.find(y) != adjacent_x.end()) { return false; }
+    } else {
+        // 1. x ← y
+        auto &parents_x = parents.at(x);
+        if (parents_x.find(y) == parents_x.end()) { return false; }
+    }
 
     // 2. T ⊆ Ne(y) \ Ad(x)
     // <=> T ⊆ Ne(y) and T does not intersect Ad(x)
@@ -226,10 +236,13 @@ bool PDAG::is_insert_valid(const Insert &insert) const {
     if (!is_clique(ne_y_ad_x_T)) { return false; }
 
     // 5. [Ne(y) ∩ Ad(x)] ∪ T block all semi-directed paths from y to x
-    if (!block_semi_directed_paths(y, x, ne_y_ad_x_T)) { return false; }
+    bool ignore_direct_edge = reverse;
+    if (!block_semi_directed_paths(y, x, ne_y_ad_x_T, ignore_direct_edge)) { return false; }
 
     return true;
 }
+
+bool PDAG::is_reverse_valid(const Reverse &reverse) const { return is_insert_valid(reverse.insert, true); }
 
 /**
  * Apply the insert to the PDAG, and adapt the graph to remain a CPDAG.
@@ -240,7 +253,7 @@ bool PDAG::is_insert_valid(const Insert &insert) const {
  *
  * @param insert
  */
-void PDAG::apply_insert(const Insert &insert) {
+void PDAG::apply_insert(const Insert &insert, std::set<Edge> &changed_edges) {
     int x = insert.x;
     int y = insert.y;
     auto &T = insert.T;
@@ -248,7 +261,6 @@ void PDAG::apply_insert(const Insert &insert) {
 
     // Start: The graph is a CPDAG
     EdgeQueueSet edges_to_check;
-    std::set<Edge> changed_edges;
 
     // Case 1: T is not empty;
     //  then x → y and each t → y will form a v-structure [remember t ∉ Ad(x)];
@@ -312,6 +324,21 @@ void PDAG::apply_insert(const Insert &insert) {
         std::cout << edge.x << (edge.type == EdgeType::DIRECTED ? " → " : " - ") << edge.y << ", ";
     }
     std::cout << std::endl;
+}
+
+void PDAG::apply_reverse(const Reverse &reverse, std::set<Edge> &changed_edges) {
+    // Start: The graph is a CPDAG
+
+    // todo: if we change the tracking of the edges, we'll have to add y → x here
+    // 1. remove the directed edge y → x
+    int x = reverse.insert.x;
+    int y = reverse.insert.y;
+    if (x == 6 && y == 3) {
+        std::cout << "apply_reverse(" << reverse << ")" << std::endl;
+        //
+    }
+    remove_directed_edge(y, x);
+    apply_insert(reverse.insert, changed_edges);
 }
 
 void PDAG::add_edges_around(int x, int y, EdgeQueueSet &edgeQueueSet, bool is_directed) {
@@ -473,6 +500,7 @@ void PDAG::maintain_cpdag(EdgeQueueSet &edges_to_check, std::set<Edge> &changed_
             remove_undirected_edge(x, y);
             add_directed_edge(x, y);
         }
+        // If we reach this point, the edge has been modified
 
         // remove the edge with its old type if it was in the list of changed edges
         changed_edges.erase(
