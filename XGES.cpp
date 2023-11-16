@@ -31,33 +31,82 @@ void XGES::heuristic_turn_delete_insert() {
     }
     std::cout << "candidate_inserts.size() = " << candidate_inserts.size() << std::endl;
 
-
+    int i_operations = 0;
     // now do the heuristic
-    while (!candidate_inserts.empty()) {
-        // pop the best insert
-        std::pop_heap(candidate_inserts.begin(), candidate_inserts.end());
-        auto best_insert = std::move(candidate_inserts.back());
-        candidate_inserts.pop_back();
+    while (!candidate_inserts.empty() || !candidate_reverses.empty()) {
+        // In order: reverse, delete, insert
+        // Apply only one operator per iteration
+        int x = -1;
+        int y = -1;
 
-        // check if it is still valid
-        if (pdag.is_insert_valid(best_insert)) {
-            // apply the insert
-            pdag.apply_insert(best_insert);
-            total_score += best_insert.score;
-            // log it
-            std::cout << "Insert: " << best_insert << std::endl;
-            // update the candidate inserts
-            // 1. remove all inserts to y
-            //            candidate_inserts.erase(
-            //                    std::remove_if(candidate_inserts.begin(), candidate_inserts.end(),
-            //                                   [best_insert](const Insert &insert) { return insert.y == best_insert.y; }),
-            //                    candidate_inserts.end());
-            // 2. find all possible inserts to y
-            find_inserts_to_y(best_insert.y, candidate_inserts);
-            find_inserts_to_y(best_insert.x, candidate_inserts);
+        std::set<Edge> changed_edges;
 
-            std::cout << pdag << std::endl;
+        if (!candidate_reverses.empty()) {
+            // pop the best reverse
+            std::pop_heap(candidate_reverses.begin(), candidate_reverses.end());
+            auto best_reverse = std::move(candidate_reverses.back());
+            candidate_reverses.pop_back();
+
+            // check if it is still valid
+            if (pdag.is_reverse_valid(best_reverse)) {
+                // apply the reverse
+                pdag.apply_reverse(best_reverse, changed_edges);
+                total_score += best_reverse.score;
+                // log it
+                std::cout << best_reverse << std::endl;
+                x = best_reverse.insert.x;
+                y = best_reverse.insert.y;
+            } else {
+                continue;
+            }
+
+        } else if (!candidate_inserts.empty()) {
+            // pop the best insert
+            std::pop_heap(candidate_inserts.begin(), candidate_inserts.end());
+            auto best_insert = std::move(candidate_inserts.back());
+            candidate_inserts.pop_back();
+
+            // check if it is still valid
+            if (pdag.is_insert_valid(best_insert)) {
+                // apply the insert
+                pdag.apply_insert(best_insert, changed_edges);
+                total_score += best_insert.score;
+                // log it
+                std::cout << best_insert << std::endl;
+
+                x = best_insert.x;
+                y = best_insert.y;
+            } else {
+                continue;
+            }
         }
+
+
+        // Temporary logic to update operators
+        std::set<int> touched_nodes;
+        for (auto &edge: changed_edges) {
+            touched_nodes.insert(edge.x);
+            touched_nodes.insert(edge.y);
+        }
+
+        for (auto node: touched_nodes) {
+            find_inserts_to_y(node, candidate_inserts);
+            find_reverse_to_y(node, candidate_reverses);
+        }
+
+        for (auto target: pdag.get_neighbors(y)) {
+            if (touched_nodes.find(target) != touched_nodes.end()) { continue; }
+            find_inserts_to_y(target, candidate_inserts, x);
+        }
+
+        for (auto target: pdag.get_neighbors(x)) {
+            if (touched_nodes.find(target) != touched_nodes.end()) { continue; }
+            find_inserts_to_y(target, candidate_inserts, y);
+        }
+
+        i_operations++;
+
+        std::cout << i_operations << ". score=" << total_score << " " << pdag << std::endl << std::endl;
     }
 }
 
@@ -69,27 +118,30 @@ void XGES::heuristic_turn_delete_insert() {
  *  1. x is not adjacent to y (x ∉ Ad(y))
  *  2. T ⊆ Ne(y) \ Ad(x)
  *  3. [Ne(y) ∩ Ad(x)] ∪ T is a clique
+ *  Not enforced at that stage: [Ne(y) ∩ Ad(x)] ∪ T blocks all semi-directed paths from y to x
  *
  * @param y
  * @param candidate_inserts
  */
-void XGES::find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts) {
+void XGES::find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts, int parent_x) {
     auto &adjacent_y = pdag.get_adjacent(y);
     auto &parents_y = pdag.get_parents(y);
 
-    // for now: no pre-selection
-    auto &nodes = pdag.get_nodes();
     std::set<int> possible_parents;
-    // 1. x is not adjacent to y (x ∉ Ad(y))
-    std::set_difference(nodes.begin(), nodes.end(), adjacent_y.begin(), adjacent_y.end(),
-                        std::inserter(possible_parents, possible_parents.begin()));
-    possible_parents.erase(y);// only needed because we don't have pre-selection
+
+    if (parent_x != -1) {
+        possible_parents.insert(parent_x);
+    } else {
+        // for now: no pre-selection
+        auto &nodes = pdag.get_nodes();
+        // 1. x is not adjacent to y (x ∉ Ad(y))
+        std::set_difference(nodes.begin(), nodes.end(), adjacent_y.begin(), adjacent_y.end(),
+                            std::inserter(possible_parents, possible_parents.begin()));
+        possible_parents.erase(y);// only needed because we don't have pre-selection
+    }
+
 
     for (int x: possible_parents) {
-        if (x == 1 && y == 4) {
-            std::cout << "x = " << x;
-            std::cout << ", y = " << y << std::endl;
-        }
         // 3. [Ne(y) ∩ Ad(x)] ∪ T is a clique
         // So in particular, [Ne(y) ∩ Ad(x)] must be a clique.
         auto neighbors_y_adjacent_x = pdag.get_neighbors_adjacent(y, x);
@@ -108,7 +160,7 @@ void XGES::find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts) {
         std::set<int> effective_parents_y;
         std::set_union(neighbors_y_adjacent_x.begin(), neighbors_y_adjacent_x.end(), parents_y.begin(),
                        parents_y.end(), std::inserter(effective_parents_y, effective_parents_y.begin()));
-        // <set of nodes, iterator over neighbors_y_not_adjacent_x, set of effective_parents>
+        // <T: set of nodes, iterator over neighbors_y_not_adjacent_x, effective_parents: set of nodes>
         std::stack<std::tuple<std::set<int>, std::set<int>::iterator, std::set<int>>> stack;
         // we know that T = {} is valid
         stack.emplace(std::set<int>{}, neighbors_y_not_adjacent_x.begin(), effective_parents_y);
@@ -145,6 +197,39 @@ void XGES::find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts) {
                     effective_parents_prime.insert(z);
                     stack.emplace(std::move(T_prime), it, std::move(effective_parents_prime));
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Find if I can turn x ← y into x → y.
+ * The candidate turn (x, y, T) are such that:
+ *  2. T ⊆ Ne(y) \ Ad(x)
+ *  3. [Ne(y) ∩ Ad(x)] ∪ T is a clique
+ *  Not enforced at that stage: [Ne(y) ∩ Ad(x)] ∪ T blocks all semi-directed paths from y to x (≠ than x ← y)
+ *
+ * @param y
+ * @param candidate_inserts
+ */
+
+// can i just do insert x -> y?
+void XGES::find_reverse_to_y(int y, std::vector<Reverse> &candidate_reverses) {
+    // look for all possible x ← y
+    auto &children_y = pdag.get_children(y);
+
+    for (int x: children_y) {
+
+        std::vector<Insert> candidate_inserts;
+        find_inserts_to_y(y, candidate_inserts, x);
+
+        for (auto insert: candidate_inserts) {
+            // change if we parallelize
+            double score = insert.score + scorer->score_delete(x, pdag.get_parents(x), y);
+
+            if (score > 0) {
+                candidate_reverses.emplace_back(insert, score);
+                std::push_heap(candidate_reverses.begin(), candidate_reverses.end());
             }
         }
     }
