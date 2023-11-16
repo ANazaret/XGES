@@ -24,7 +24,5 @@ private:
 
 public:
     BICScorer(const MatrixXd &data, double alpha);
-    double local_score(int target, const std::set<int> &parents) const;
-
-    double local_diff_score(int target, const std::set<int> &parents, int new_parent) const override;
+    double local_score(int target, const std::set<int> &parents) const override;
 };

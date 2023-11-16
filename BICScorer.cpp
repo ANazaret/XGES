@@ -26,15 +26,6 @@ BICScorer::BICScorer(const Eigen::MatrixXd &data, double alpha)
     n_samples = data.rows();
 }
 
-double BICScorer::local_diff_score(int target, const std::set<int> &parents, int new_parent) const {
-    //compute local_score(target, parents U {new_parent}) - local_score(target, parents)
-    // can be optimized to not create a new set
-    std::set<int> parents_with_new_parent = parents;
-    parents_with_new_parent.insert(new_parent);
-    double score_with_new_parent = local_score(target, parents_with_new_parent);
-    double score_without_new_parent = local_score(target, parents);
-    return score_with_new_parent - score_without_new_parent;
-}
 
 double BICScorer::local_score(int target, const std::set<int> &parents) const {
     // cache lookup
