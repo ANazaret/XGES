@@ -202,6 +202,70 @@ void XGES::find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts, int 
     }
 }
 
+/** Find all possible deletes to y.
+ *
+ * The candidate deletes (x, y, H) are such that:
+ *  1. x is a parent or a neighbor of y
+ *  2. H ⊆ [Ne(y) ∩ Ad(x)]  (alt. O ⊆ [Ne(y) ∩ Ad(x)] -- the complement of H in [Ne(y) ∩ Ad(x)])
+ *  3. [Ne(y) ∩ Ad(x)] \ H is a clique (alt. O is a clique)
+ *
+ *  The effective parents_y are Pa(y) ∪ [Ne(y) ∩ Ad(x)] \ H (alt. Pa(y) ∪ O)
+ *
+ * @param y
+ * @param candidate_deletes
+ */
+void XGES::find_deletes_to_y(int y, std::vector<Delete> &candidate_deletes) {
+    auto &neighbors_y = pdag.get_neighbors(y);
+    auto &parents_y = pdag.get_parents(y);
+
+    std::vector<int> possible_x;
+    possible_x.insert(possible_x.end(), parents_y.begin(), parents_y.end());
+    possible_x.insert(possible_x.end(), neighbors_y.begin(), neighbors_y.end());
+
+    for (int x: possible_x) {
+        auto neighbors_y_adjacent_x = pdag.get_neighbors_adjacent(y, x);
+
+        // find all possible O ⊆ [Ne(y) ∩ Ad(x)] that are cliques, quite similar to the inserts but simpler
+        // <O set of nodes, iterator over neighbors_y_adjacent_x, set of effective_parents>
+        std::stack<std::tuple<std::set<int>, std::set<int>::iterator, std::set<int>>> stack;
+        // we know that O = {} is valid
+        stack.emplace(std::set<int>{}, neighbors_y_adjacent_x.begin(), parents_y);
+
+        while (!stack.empty()) {
+            auto top = std::move(stack.top());
+            stack.pop();
+            auto O = std::get<0>(top);
+            auto it = std::get<1>(top);
+            auto effective_parents = std::get<2>(top);
+
+            // change if we parallelize
+            double score = scorer->score_delete(y, effective_parents, x);
+            if (score > 0) {
+                candidate_deletes.emplace_back(x, y, O, score, effective_parents);
+                std::push_heap(candidate_deletes.begin(), candidate_deletes.end());
+            }
+
+            // Look for other candidate O using the iterator, which gives us the next elements z to consider.
+            while (it != neighbors_y_adjacent_x.end()) {
+                // We define O' = O ∪ {z} and we check if O' is a clique.
+                // Since O was a clique, we only need to check that z is adjacent to all nodes in O.
+                auto z = *it;
+                ++it;
+                auto &adjacent_z = pdag.get_adjacent(z);
+                // We check that O ⊆ Ad(z)
+                if (std::includes(adjacent_z.begin(), adjacent_z.end(), O.begin(), O.end())) {
+                    // O' is a candidate
+                    std::set<int> O_prime = O;
+                    O_prime.insert(z);
+                    std::set<int> effective_parents_prime = effective_parents;
+                    effective_parents_prime.insert(z);
+                    stack.emplace(std::move(O_prime), it, std::move(effective_parents_prime));
+                }
+            }
+        }
+    }
+}
+
 /**
  * Find if I can turn x ← y into x → y.
  * The candidate turn (x, y, T) are such that:

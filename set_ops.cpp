@@ -9,16 +9,10 @@ bool is_subset(const std::set<int> &a, const std::set<int> &b) {
 }
 
 bool have_overlap(const std::set<int> &a, const std::set<int> &b) {
-    if (a.empty() || b.empty()) {
-        return false;
-    }
-    if (a.size() > b.size()) {
-        return have_overlap(b, a);
-    }
+    if (a.empty() || b.empty()) { return false; }
+    if (a.size() > b.size()) { return have_overlap(b, a); }
     for (auto &i: a) {
-        if (b.find(i) != b.end()) {
-            return true;
-        }
+        if (b.find(i) != b.end()) { return true; }
     }
     return false;
 }
@@ -39,7 +33,7 @@ void intersect_in_place(std::set<int> &a, const std::set<int> &b) {
             it1 = a.erase(it1);
         } else if (*it2 < *it1) {
             ++it2;
-        } else { // *it1 == *it2
+        } else {// *it1 == *it2
             ++it1;
             ++it2;
         }
@@ -73,8 +67,6 @@ bool equal_union(const std::set<int> &a, const std::set<int> &b1, const std::set
             return false;
         }
     }
-    if (itb1 != b1.end() || itb2 != b2.end()) {
-        return false;
-    }
+    if (itb1 != b1.end() || itb2 != b2.end()) { return false; }
     return true;
 }

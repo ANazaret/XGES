@@ -302,15 +302,6 @@ void PDAG::apply_insert(const Insert &insert, std::set<Edge> &changed_edges) {
 
     // now need to decide which edges to check,
 
-    // Transport to new contexts
-    // Transport to new perturbations
-    // but trained or not trained?
-    // cluster genes together
-    // where does the large width regime comes into play?
-    // what is the difference between the two regimes?
-    // what is the structure of the neural network? how do you get a causal graph Z
-
-
     // i have added edge (x,y)
     // i need to check the adjacent edges that might be affected by this update
     // easy answer: all edges adjacent to x or y

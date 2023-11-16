@@ -35,6 +35,7 @@ public:
 
     void find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts, int parent_x = -1);
 
-    void find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts);
+    void find_deletes_to_y(int y, std::vector<Delete> &candidate_deletes);
+
     void find_reverse_to_y(int y, std::vector<Reverse> &candidate_reverses);
 };
