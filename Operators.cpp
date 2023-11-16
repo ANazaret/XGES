@@ -17,8 +17,8 @@ std::ostream &operator<<(std::ostream &os, const Insert &obj) {
 }
 
 
-Delete::Delete(int x, int y, const std::set<int> &H, double score, std::set<int> effective_parents)
-    : x(x), y(y), H(H), score(score) {}
+Delete::Delete(int x, int y, const std::set<int> &O, double score, std::set<int> effective_parents)
+    : x(x), y(y), O(O), score(score) {}
 
 std::ostream &operator<<(std::ostream &os, const Delete &obj) {
     os << "Delete: x = " << obj.x << ", y = " << obj.y << ", H = {";

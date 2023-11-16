@@ -31,7 +31,7 @@ private:
 
 class Delete {
 public:
-    Delete(int x, int y, const std::set<int> &H, double score, std::set<int> effective_parents);
+    Delete(int x, int y, const std::set<int> &O, double score, std::set<int> effective_parents);
 
     friend std::ostream &operator<<(std::ostream &os, const Delete &obj);
 
@@ -46,5 +46,9 @@ private:
     int x, y;
     std::set<int> H;
     // std::set<int> effective_parents;// = [Ne(y) ∩ Ad(x)] ∪ T ∪ Pa(y)
+    std::set<int> O;
+    //std::set<int> effective_parents; // =
+    double score = 0;
+};
     double score = 0;
 };
