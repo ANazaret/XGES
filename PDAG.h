@@ -5,7 +5,9 @@
 #pragma once
 
 #include "EdgeQueueSet.h"
-#include "Insert.h"
+#include "Operators.h"
+#include "set_ops.h"
+#include <map>
 #include <queue>
 #include <set>
 #include <tuple>

@@ -268,16 +268,18 @@ void PDAG::apply_insert(const Insert &insert, std::set<Edge> &changed_edges) {
     if (!T.empty()) {
         // 1. insert the directed edge x → y
         add_directed_edge(x, y);
-        add_edges_around(x, y, edges_to_check, true);
         changed_edges.insert({x, y, EdgeType::DIRECTED});
 
         // 2. for each t ∈ T: orient the (previously undirected) edge between t and y as t → y
         for (int t: T) {
             remove_undirected_edge(t, y);
             add_directed_edge(t, y);
-            add_edges_around(t, y, edges_to_check, true);
             changed_edges.insert({t, y, EdgeType::DIRECTED});
         }
+
+        // only now:
+        add_edges_around(x, y, edges_to_check, true);
+        for (int t: T) { add_edges_around(t, y, edges_to_check, true); }
     } else {
         // Case 2: T is empty;
         //  then x → y is part of a v-structure if and only if Pa(y) \ Ad(x) ≠ ∅.
@@ -319,7 +321,7 @@ void PDAG::apply_insert(const Insert &insert, std::set<Edge> &changed_edges) {
 
     // End: The graph is a CPDAG
     // print changed edges
-    std::cout << "changed_edges.size() = " << changed_edges.size() << std::endl;
+    std::cout << "changed_edges.size() = " << changed_edges.size() << ": ";
     for (auto edge: changed_edges) {
         std::cout << edge.x << (edge.type == EdgeType::DIRECTED ? " → " : " - ") << edge.y << ", ";
     }
