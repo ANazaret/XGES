@@ -23,8 +23,8 @@ public:
     double score_delete(int target, const std::set<int> &parents, int parent_to_remove) {
         std::set<int> parents_without_old_parent = parents;
         parents_without_old_parent.erase(parent_to_remove);
-        double score_with_old_parent = local_score(target, parents);
-        double score_without_old_parent = local_score(target, parents_without_old_parent);
-        return score_without_old_parent - score_with_old_parent;
+        // note that Chickering Corrollary 18 is incorrect. Pa(y) might not contain x, it has to be
+        // added (it is in the score_insert function)
+        return -score_insert(target, parents_without_old_parent, parent_to_remove);
     }
 };

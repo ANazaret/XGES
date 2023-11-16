@@ -70,3 +70,10 @@ bool equal_union(const std::set<int> &a, const std::set<int> &b1, const std::set
     if (itb1 != b1.end() || itb2 != b2.end()) { return false; }
     return true;
 }
+
+std::ostream &operator<<(std::ostream &os, const std::set<int> &obj) {
+    os << "{";
+    for (auto &i: obj) { os << i << ", "; }
+    os << "}";
+    return os;
+}

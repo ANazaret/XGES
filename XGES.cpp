@@ -23,6 +23,13 @@ void XGES::heuristic_turn_delete_insert() {
     std::vector<Insert> candidate_inserts;
     candidate_inserts.reserve(100 * n_variables);
 
+    std::vector<Reverse> candidate_reverses;
+    candidate_inserts.reserve(n_variables);
+
+    std::vector<Delete> candidate_deletes;
+    candidate_deletes.reserve(n_variables);
+
+
     // init the candidate inserts
     std::cout << "n_variables = " << n_variables << std::endl;
     for (int y = 0; y < n_variables; ++y) {
@@ -31,9 +38,9 @@ void XGES::heuristic_turn_delete_insert() {
     }
     std::cout << "candidate_inserts.size() = " << candidate_inserts.size() << std::endl;
 
-    int i_operations = 0;
+    int i_operations = 1;
     // now do the heuristic
-    while (!candidate_inserts.empty() || !candidate_reverses.empty()) {
+    while (!candidate_inserts.empty() || !candidate_reverses.empty() || !candidate_deletes.empty()) {
         // In order: reverse, delete, insert
         // Apply only one operator per iteration
         int x = -1;
@@ -41,7 +48,27 @@ void XGES::heuristic_turn_delete_insert() {
 
         std::set<Edge> changed_edges;
 
-        if (!candidate_reverses.empty()) {
+        if (!candidate_deletes.empty()) {
+            // pop the best delete
+            std::pop_heap(candidate_deletes.begin(), candidate_deletes.end());
+            auto best_delete = std::move(candidate_deletes.back());
+            candidate_deletes.pop_back();
+
+            // check if it is still valid
+            if (pdag.is_delete_valid(best_delete)) {
+                // apply the delete
+                pdag.apply_delete(best_delete, changed_edges);
+                total_score += best_delete.score;
+                // log it
+                std::cout << i_operations << ". " << best_delete << std::endl;
+
+                x = best_delete.x;
+                y = best_delete.y;
+            } else {
+                continue;
+            }
+
+        } else if (!candidate_reverses.empty()) {
             // pop the best reverse
             std::pop_heap(candidate_reverses.begin(), candidate_reverses.end());
             auto best_reverse = std::move(candidate_reverses.back());
@@ -53,7 +80,7 @@ void XGES::heuristic_turn_delete_insert() {
                 pdag.apply_reverse(best_reverse, changed_edges);
                 total_score += best_reverse.score;
                 // log it
-                std::cout << best_reverse << std::endl;
+                std::cout << i_operations << ". " << best_reverse << std::endl;
                 x = best_reverse.insert.x;
                 y = best_reverse.insert.y;
             } else {
@@ -72,7 +99,7 @@ void XGES::heuristic_turn_delete_insert() {
                 pdag.apply_insert(best_insert, changed_edges);
                 total_score += best_insert.score;
                 // log it
-                std::cout << best_insert << std::endl;
+                std::cout << i_operations << ". " << best_insert << std::endl;
 
                 x = best_insert.x;
                 y = best_insert.y;
@@ -92,6 +119,8 @@ void XGES::heuristic_turn_delete_insert() {
         for (auto node: touched_nodes) {
             find_inserts_to_y(node, candidate_inserts);
             find_reverse_to_y(node, candidate_reverses);
+            find_reverse_from_x(node, candidate_reverses);
+            find_deletes_to_y(node, candidate_deletes);
         }
 
         for (auto target: pdag.get_neighbors(y)) {
@@ -106,7 +135,7 @@ void XGES::heuristic_turn_delete_insert() {
 
         i_operations++;
 
-        std::cout << i_operations << ". score=" << total_score << " " << pdag << std::endl << std::endl;
+        std::cout << "score=" << total_score << " " << pdag << std::endl << std::endl;
     }
 }
 
@@ -283,6 +312,28 @@ void XGES::find_reverse_to_y(int y, std::vector<Reverse> &candidate_reverses) {
     auto &children_y = pdag.get_children(y);
 
     for (int x: children_y) {
+
+        std::vector<Insert> candidate_inserts;
+        find_inserts_to_y(y, candidate_inserts, x);
+
+        for (auto insert: candidate_inserts) {
+            // change if we parallelize
+            double score = insert.score + scorer->score_delete(x, pdag.get_parents(x), y);
+
+            if (score > 0) {
+                candidate_reverses.emplace_back(insert, score);
+                std::push_heap(candidate_reverses.begin(), candidate_reverses.end());
+            }
+        }
+    }
+}
+
+void XGES::find_reverse_from_x(int x, std::vector<Reverse> &candidate_reverses) {
+    // look for all possible x ← y
+    auto &parents_x = pdag.get_parents(x);
+
+
+    for (int y: parents_x) {
 
         std::vector<Insert> candidate_inserts;
         find_inserts_to_y(y, candidate_inserts, x);

@@ -48,7 +48,7 @@ public:
 private:
     int x, y;
     std::set<int> O;
-    //std::set<int> effective_parents; // =
+    std::set<int> effective_parents;// O ∪ Pa(y)
     double score = 0;
 };
 

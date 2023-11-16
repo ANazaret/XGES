@@ -86,11 +86,14 @@ public:
 
     bool is_reverse_valid(const Reverse &reverse) const;
 
+    bool is_delete_valid(const Delete &delet) const;
+
     bool block_semi_directed_paths(int src, int dst, const std::set<int> &blocked_nodes,
                                    bool ignore_direct_edge = false) const;
 
     void apply_insert(const Insert &insert, std::set<Edge> &changed_edges);
     void apply_reverse(const Reverse &reverse, std::set<Edge> &changed_edges);
+    void apply_delete(const Delete &delet, std::set<Edge> &changed_edges);
 
     void maintain_cpdag(EdgeQueueSet &edges_to_check, std::set<Edge> &changed_edges);
 

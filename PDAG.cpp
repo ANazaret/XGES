@@ -244,6 +244,29 @@ bool PDAG::is_insert_valid(const Insert &insert, bool reverse) const {
 
 bool PDAG::is_reverse_valid(const Reverse &reverse) const { return is_insert_valid(reverse.insert, true); }
 
+bool PDAG::is_delete_valid(const Delete &delet) const {
+    // 1. x and y are neighbors or x is a parent of y [aka y is adjacent_reachable from x]
+    int x = delet.x;
+    int y = delet.y;
+    if (adjacent_reachable.at(x).find(y) == adjacent_reachable.at(x).end()) { return false; }
+
+    // 2. O is a subset of Ne(y) ∩ Ad(x)
+    // <=> O ⊆ Ne(y) and O ⊆ Ad(x)
+    auto &neighbors_y = neighbors.at(y);
+    auto &adjacent_x = adjacent.at(x);
+    if (!is_subset(delet.O, neighbors_y) || !is_subset(delet.O, adjacent_x)) { return false; }
+
+    // 3. O and Pa(y) are unchanged (technically only need O ∪ Pa(y) to be
+    // unchanged)
+    // <=> delet.effective_parents == O ∪ Pa(y)
+    if (!equal_union(delet.effective_parents, delet.O, parents.at(y))) { return false; }
+
+    // 4. O is a clique
+    if (!is_clique(delet.O)) { return false; }
+
+    return true;
+}
+
 /**
  * Apply the insert to the PDAG, and adapt the graph to remain a CPDAG.
  *
@@ -312,11 +335,11 @@ void PDAG::apply_insert(const Insert &insert, std::set<Edge> &changed_edges) {
 
     // End: The graph is a CPDAG
     // print changed edges
-    std::cout << "changed_edges.size() = " << changed_edges.size() << ": ";
-    for (auto edge: changed_edges) {
-        std::cout << edge.x << (edge.type == EdgeType::DIRECTED ? " → " : " - ") << edge.y << ", ";
-    }
-    std::cout << std::endl;
+    //    std::cout << "changed_edges.size() = " << changed_edges.size() << ": ";
+    //    for (auto edge: changed_edges) {
+    //        std::cout << edge.x << (edge.type == EdgeType::DIRECTED ? " → " : " - ") << edge.y << ", ";
+    //    }
+    //    std::cout << std::endl;
 }
 
 void PDAG::apply_reverse(const Reverse &reverse, std::set<Edge> &changed_edges) {
@@ -333,6 +356,49 @@ void PDAG::apply_reverse(const Reverse &reverse, std::set<Edge> &changed_edges) 
     remove_directed_edge(y, x);
     apply_insert(reverse.insert, changed_edges);
 }
+
+void PDAG::apply_delete(const Delete &aDelete, std::set<Edge> &changed_edges) {
+    // Start: The graph is a CPDAG
+    if (has_directed_edge(aDelete.x, aDelete.y)) {
+        // 1. remove the directed edge x → y
+        remove_directed_edge(aDelete.x, aDelete.y);
+        changed_edges.insert({aDelete.x, aDelete.y, EdgeType::DIRECTED});
+    } else {
+        // 1. remove the undirected edge x - y
+        remove_undirected_edge(aDelete.x, aDelete.y);
+        changed_edges.insert({aDelete.x, aDelete.y, EdgeType::UNDIRECTED});
+    }
+
+    // H = Ne(y) ∩ Ad(x) \ O
+    std::set<int> H = get_neighbors(aDelete.y);
+    intersect_in_place(H, get_adjacent(aDelete.x));
+    for (int z: aDelete.O) { H.erase(z); }
+
+
+    // 2. for each h ∈ H:
+    //   - orient the (previously undirected) edge between h and y as y → h [they are all undirected]
+    //   - orient any (previously undirected) edge between x and h as x → h [some might be undirected]
+    for (int h: H) {
+        remove_undirected_edge(aDelete.y, h);
+        add_directed_edge(aDelete.y, h);
+        changed_edges.insert({aDelete.y, h, EdgeType::DIRECTED});
+
+        if (has_undirected_edge(aDelete.x, h)) {
+            remove_undirected_edge(aDelete.x, h);
+            add_directed_edge(aDelete.x, h);
+            changed_edges.insert({aDelete.x, h, EdgeType::DIRECTED});
+        }
+    }
+    EdgeQueueSet edges_to_check;
+
+    add_edges_around(aDelete.x, aDelete.y, edges_to_check, false);
+    for (int h: H) {
+        add_edges_around(h, aDelete.y, edges_to_check, true);
+        add_edges_around(aDelete.x, h, edges_to_check, true);// shouldnt make a difference
+    }
+    maintain_cpdag(edges_to_check, changed_edges);
+}
+
 
 void PDAG::add_edges_around(int x, int y, EdgeQueueSet &edgeQueueSet, bool is_directed) {
     for (int z: children.at(y)) {
