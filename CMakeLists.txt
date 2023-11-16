@@ -10,8 +10,8 @@ add_executable(ges_cpp main.cpp
         PDAG.cpp
         PDAG.h
         ScorerInterface.h
-        Insert.h
-        Insert.cpp
+        Operators.h
+        Operators.cpp
         set_ops.h
         set_ops.cpp
         EdgeQueueSet.cpp
