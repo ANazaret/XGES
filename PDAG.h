@@ -25,7 +25,7 @@ enum class PDAGModification {
 // Declare the PDAG class.
 class PDAG {
 private:
-    int num_nodes;
+    const int num_nodes;
     std::vector<int> nodes;
     std::vector<std::set<int>> children;
     std::vector<std::set<int>> parents;
@@ -39,8 +39,11 @@ private:
     std::vector<int> node_version;
     int graph_version = 0;
     std::vector<std::tuple<PDAGModification, int, int>> modifications_history;
+    //    std::vector<char> _block_semi_directed_path_visited;
 
 public:
+    std::map<std::string, double> statistics;
+
     explicit PDAG(int num_nodes);
 
     /**
@@ -82,14 +85,14 @@ public:
 
     void add_undirected_edge(int x, int y);
 
-    bool is_insert_valid(const Insert &insert, bool reverse = false) const;
+    bool is_insert_valid(const Insert &insert, bool reverse = false);
 
-    bool is_reverse_valid(const Reverse &reverse) const;
+    bool is_reverse_valid(const Reverse &reverse);
 
     bool is_delete_valid(const Delete &delet) const;
 
     bool block_semi_directed_paths(int src, int dst, const std::set<int> &blocked_nodes,
-                                   bool ignore_direct_edge = false) const;
+                                   bool ignore_direct_edge = false);
 
     void apply_insert(const Insert &insert, std::set<Edge> &changed_edges);
     void apply_reverse(const Reverse &reverse, std::set<Edge> &changed_edges);

@@ -14,6 +14,8 @@ PDAG::PDAG(int num_nodes) : num_nodes(num_nodes) {
         adjacent_reachable.emplace_back();
         node_version.push_back(0);
     }
+
+    //    _block_semi_directed_path_visited.resize(num_nodes);
 }
 
 int PDAG::get_number_of_edges() const { return number_of_directed_edges + number_of_undirected_edges; }
@@ -153,11 +155,14 @@ void PDAG::add_undirected_edge(int x, int y) {
  * @return `true` if blocked_nodes block all semi-directed paths from src to dst, `false` otherwise.
  */
 bool PDAG::block_semi_directed_paths(int src, int dst, const std::set<int> &blocked_nodes,
-                                     bool ignore_direct_edge) const {
+                                     bool ignore_direct_edge) {
+    statistics["call_block_semi_directed_paths"] += 1;
     if (src == dst) { return false; }
     // BFS search from y to x, using adjacent_reachable edges, avoiding blocked nodes
-    std::set<int> visited;
-    visited.insert(src);
+    //    auto &visited = _block_semi_directed_path_visited;
+    //    std::fill(visited.begin(), visited.end(), 0);
+    std::vector<char> visited(num_nodes, 0);
+    visited[src] = 1;
 
     std::queue<int> queue;
     queue.push(src);
@@ -165,24 +170,16 @@ bool PDAG::block_semi_directed_paths(int src, int dst, const std::set<int> &bloc
     while (!queue.empty()) {
         int node = queue.front();
         queue.pop();
-        // it would be possible to not do a copy and not do find later (probably a minor optimization)
-        auto reachable = get_adjacent_reachable(node);
+        auto &reachable = get_adjacent_reachable(node);
 
-        if (reachable.find(dst) != reachable.end()) {
-            if (!(ignore_direct_edge && node == src)) { return false; }
-            reachable.erase(dst);
-        }
-        // remove blocked nodes and already visited nodes
-        for (auto it = reachable.begin(); it != reachable.end();) {
-            if (blocked_nodes.find(*it) != blocked_nodes.end() || visited.find(*it) != visited.end()) {
-                it = reachable.erase(it);
-            } else {
-                ++it;
-            }
-        }
         for (int n: reachable) {
+            if (visited[n] || blocked_nodes.find(n) != blocked_nodes.end() ||
+                (node == src && n == dst && ignore_direct_edge)) {
+                continue;
+            }
+            if (n == dst) { return false; }
             queue.push(n);
-            visited.insert(n);
+            visited[n] = 1;
         }
     }
     return true;
@@ -202,7 +199,7 @@ bool PDAG::block_semi_directed_paths(int src, int dst, const std::set<int> &bloc
  * @param insert
  * @return ??
  */
-bool PDAG::is_insert_valid(const Insert &insert, bool reverse) const {
+bool PDAG::is_insert_valid(const Insert &insert, bool reverse) {
     int x = insert.x;
     int y = insert.y;
     auto &T = insert.T;
@@ -242,7 +239,7 @@ bool PDAG::is_insert_valid(const Insert &insert, bool reverse) const {
     return true;
 }
 
-bool PDAG::is_reverse_valid(const Reverse &reverse) const { return is_insert_valid(reverse.insert, true); }
+bool PDAG::is_reverse_valid(const Reverse &reverse) { return is_insert_valid(reverse.insert, true); }
 
 bool PDAG::is_delete_valid(const Delete &delet) const {
     // 1. x and y are neighbors or x is a parent of y [aka y is adjacent_reachable from x]

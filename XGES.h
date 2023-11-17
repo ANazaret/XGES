@@ -31,7 +31,7 @@ public:
 
     double get_score() const;
 
-    PDAG get_pdag() const;
+    const PDAG &get_pdag() const;
 
     void find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts, int parent_x = -1);
 
