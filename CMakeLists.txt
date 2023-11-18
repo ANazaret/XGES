@@ -6,7 +6,8 @@ set(EIGEN3_INCLUDE_DIR "eigen-3.4.0")
 include_directories(${EIGEN3_INCLUDE_DIR})
 add_subdirectory(cnpy)
 
-add_executable(ges_cpp main.cpp
+add_executable(
+        ges_cpp main.cpp
         PDAG.cpp
         PDAG.h
         ScorerInterface.h
@@ -19,7 +20,9 @@ add_executable(ges_cpp main.cpp
         XGES.cpp
         XGES.h
         BICScorer.cpp
-        BICScorer.h)
+        BICScorer.h
+        CircularBuffer.h
+)
 
 # Include library headers
 # Include the cnpy directory
