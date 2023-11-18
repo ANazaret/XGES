@@ -157,7 +157,7 @@ void PDAG::add_undirected_edge(int x, int y) {
  */
 bool PDAG::block_semi_directed_paths(int src, int dst, const std::set<int> &blocked_nodes,
                                      bool ignore_direct_edge) {
-    statistics["call_block_semi_directed_paths"] += 1;
+    statistics["call- block_semi_directed_paths"] += 1;
     if (src == dst) { return false; }
     // BFS search from y to x, using adjacent_reachable edges, avoiding blocked nodes
     auto &visited = _block_semi_directed_path_visited;
@@ -202,6 +202,7 @@ bool PDAG::block_semi_directed_paths(int src, int dst, const std::set<int> &bloc
  * @return ??
  */
 bool PDAG::is_insert_valid(const Insert &insert, bool reverse) {
+    statistics["call- is_insert_valid"] += 1;
     int x = insert.x;
     int y = insert.y;
     auto &T = insert.T;
@@ -211,17 +212,26 @@ bool PDAG::is_insert_valid(const Insert &insert, bool reverse) {
     auto &adjacent_x = adjacent.at(x);
     if (!reverse) {
         // 1. x and y are not adjacent
-        if (adjacent_x.find(y) != adjacent_x.end()) { return false; }
+        if (adjacent_x.find(y) != adjacent_x.end()) {
+            statistics["is_insert_valid: false 1a"] += 1;
+            return false;
+        }
     } else {
         // 1. x ← y
         auto &parents_x = parents.at(x);
-        if (parents_x.find(y) == parents_x.end()) { return false; }
+        if (parents_x.find(y) == parents_x.end()) {
+            statistics["is_insert_valid: false 1b"] += 1;
+            return false;
+        }
     }
 
     // 2. T ⊆ Ne(y) \ Ad(x)
     // <=> T ⊆ Ne(y) and T does not intersect Ad(x)
     auto &neighbors_y = neighbors.at(y);
-    if (!is_subset(T, neighbors_y) || have_overlap(T, adjacent_x)) { return false; }
+    if (!is_subset(T, neighbors_y) || have_overlap(T, adjacent_x)) {
+        statistics["is_insert_valid: false 2"] += 1;
+        return false;
+    }
 
     // 3. [Ne(y) ∩ Ad(x)] ∪ T ∪ Pa(y) has not changed
     // <=> insert.effective_parents == [Ne(y) ∩ Ad(x)] ∪ T ∪ Pa(y)
@@ -229,14 +239,26 @@ bool PDAG::is_insert_valid(const Insert &insert, bool reverse) {
     // intersect effective_parents with Ad(x)
     intersect_in_place(ne_y_ad_x_T, adjacent_x);
     ne_y_ad_x_T.insert(T.begin(), T.end());
-    if (!equal_union(insert.effective_parents, ne_y_ad_x_T, parents.at(y))) { return false; }
+    if (!equal_union(insert.effective_parents, ne_y_ad_x_T, parents.at(y))) {
+        statistics["is_insert_valid: false 3"] += 1;
+        return false;
+    }
 
     // 4. [Ne(y) ∩ Ad(x)] ∪ T is a clique
-    if (!is_clique(ne_y_ad_x_T)) { return false; }
+    if (!is_clique(ne_y_ad_x_T)) {
+        statistics["is_insert_valid: false 4"] += 1;
+        return false;
+    }
 
     // 5. [Ne(y) ∩ Ad(x)] ∪ T block all semi-directed paths from y to x
     bool ignore_direct_edge = reverse;
-    if (!block_semi_directed_paths(y, x, ne_y_ad_x_T, ignore_direct_edge)) { return false; }
+    clock_t start = clock();
+    if (!block_semi_directed_paths(y, x, ne_y_ad_x_T, ignore_direct_edge)) {
+        statistics["is_insert_valid: false 5"] += 1;
+        statistics["time- block_semi_directed_paths: false"] += double(clock() - start) / CLOCKS_PER_SEC;
+        return false;
+    }
+    statistics["time- block_semi_directed_paths: true"] += double(clock() - start) / CLOCKS_PER_SEC;
 
     return true;
 }
@@ -348,10 +370,6 @@ void PDAG::apply_reverse(const Reverse &reverse, std::set<Edge> &changed_edges) 
     // 1. remove the directed edge y → x
     int x = reverse.insert.x;
     int y = reverse.insert.y;
-    if (x == 6 && y == 3) {
-        std::cout << "apply_reverse(" << reverse << ")" << std::endl;
-        //
-    }
     remove_directed_edge(y, x);
     apply_insert(reverse.insert, changed_edges);
 }
@@ -566,6 +584,25 @@ void PDAG::maintain_cpdag(EdgeQueueSet &edges_to_check, std::set<Edge> &changed_
         // Add the edge to the list of changed edges, with its new type
         EdgeType new_type = edge.type == EdgeType::UNDIRECTED ? EdgeType::DIRECTED : EdgeType::UNDIRECTED;
         changed_edges.insert({x, y, new_type});
+
+        //        UnorderedPair edge_unordered = {x, y};
+        //        if (const auto edge_modification = edge_modifications.find(edge_unordered);
+        //            edge_modification != edge_modifications.end()) {
+        //            // the edge was already modified
+        //            // we need to update the type of the edge modification
+        //            auto old_type = edge_modification->second.type;
+        //            if (old_type == EdgeModificationType::NONE_TO_DIRECTED) {
+        //                assert(edge.type == EdgeType::DIRECTED);
+        //                edge_modification->second.type = EdgeModificationType::NONE_TO_UNDIRECTED;
+        //            } else if (old_type == EdgeModificationType::NONE_TO_UNDIRECTED) {
+        //                assert(edge.type == EdgeType::UNDIRECTED);
+        //                edge_modification->second.type = EdgeModificationType::NONE_TO_DIRECTED;
+        //            } else {
+        //                // we delete the edge as it is not modified anymore
+        //                edge_modifications.erase(edge_unordered);
+        //            }
+        //        }
+        //        auto new_type = (edge.type == EdgeType::DIRECTED) ? EdgeType::UNDIRECTED : EdgeType::DIRECTED;
 
         // We have updated edge (x, y)
         // We need to check the adjacent edges that might be affected by this update

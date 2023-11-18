@@ -40,4 +40,6 @@ public:
     void find_reverse_to_y(int y, std::vector<Reverse> &candidate_reverses);
 
     void find_reverse_from_x(int x, std::vector<Reverse> &candidate_reverses);
+
+    std::map<std::string, double> statistics;
 };

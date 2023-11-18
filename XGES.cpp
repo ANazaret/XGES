@@ -32,10 +32,12 @@ void XGES::heuristic_turn_delete_insert() {
 
     // init the candidate inserts
     std::cout << "n_variables = " << n_variables << std::endl;
+    clock_t start_init_inserts = clock();
     for (int y = 0; y < n_variables; ++y) {
         // find all possible inserts to y
-        find_inserts_to_y(y, candidate_inserts);
+        find_inserts_to_y(y, candidate_inserts, -1, true);
     }
+    statistics["time- init_inserts"] = (double) (clock() - start_init_inserts) / CLOCKS_PER_SEC;
     std::cout << "candidate_inserts.size() = " << candidate_inserts.size() << std::endl;
 
     int i_operations = 1;
@@ -135,7 +137,7 @@ void XGES::heuristic_turn_delete_insert() {
 
         i_operations++;
 
-        std::cout << "score=" << total_score << " " << pdag << std::endl << std::endl;
+        std::cout << "score=" << total_score << std::endl << std::endl;
     }
 }
 
@@ -202,7 +204,9 @@ void XGES::find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts, int 
             auto effective_parents = std::get<2>(top);
 
             // change if we parallelize
+            clock_t start = clock();
             double score = scorer->score_insert(y, effective_parents, x);
+            statistics["time- score_insert"] += (double) (clock() - start) / CLOCKS_PER_SEC;
             if (score > 0) {
                 candidate_inserts.emplace_back(x, y, T, score, effective_parents);
                 std::push_heap(candidate_inserts.begin(), candidate_inserts.end());
@@ -349,3 +353,8 @@ void XGES::find_reverse_from_x(int x, std::vector<Reverse> &candidate_reverses) 
         }
     }
 }
+
+
+const PDAG &XGES::get_pdag() const { return pdag; }
+
+double XGES::get_score() const { return total_score; }
