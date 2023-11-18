@@ -33,7 +33,8 @@ public:
 
     const PDAG &get_pdag() const;
 
-    void find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts, int parent_x = -1);
+    void find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts, int parent_x = -1,
+                           bool low_parent_only = false);
 
     void find_deletes_to_y(int y, std::vector<Delete> &candidate_deletes);
 

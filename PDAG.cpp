@@ -379,11 +379,11 @@ void PDAG::apply_delete(const Delete &aDelete, std::set<Edge> &changed_edges) {
     if (has_directed_edge(aDelete.x, aDelete.y)) {
         // 1. remove the directed edge x → y
         remove_directed_edge(aDelete.x, aDelete.y);
-        changed_edges.insert({aDelete.x, aDelete.y, EdgeType::DIRECTED});
+        changed_edges.insert({aDelete.x, aDelete.y, EdgeType::NONE});
     } else {
         // 1. remove the undirected edge x - y
         remove_undirected_edge(aDelete.x, aDelete.y);
-        changed_edges.insert({aDelete.x, aDelete.y, EdgeType::UNDIRECTED});
+        changed_edges.insert({aDelete.x, aDelete.y, EdgeType::NONE});
     }
 
     // H = Ne(y) ∩ Ad(x) \ O

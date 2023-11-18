@@ -41,6 +41,11 @@ void XGES::heuristic_turn_delete_insert() {
     std::cout << "candidate_inserts.size() = " << candidate_inserts.size() << std::endl;
 
     int i_operations = 1;
+
+    int duplicate_inserts = 0;
+    int n_inserts = 0;
+    Insert last_insert(-1, -1, std::set<int>{}, -1, std::set<int>{});
+
     // now do the heuristic
     while (!candidate_inserts.empty() || !candidate_reverses.empty() || !candidate_deletes.empty()) {
         // In order: reverse, delete, insert
@@ -63,9 +68,6 @@ void XGES::heuristic_turn_delete_insert() {
                 total_score += best_delete.score;
                 // log it
                 std::cout << i_operations << ". " << best_delete << std::endl;
-
-                x = best_delete.x;
-                y = best_delete.y;
             } else {
                 continue;
             }
@@ -83,8 +85,6 @@ void XGES::heuristic_turn_delete_insert() {
                 total_score += best_reverse.score;
                 // log it
                 std::cout << i_operations << ". " << best_reverse << std::endl;
-                x = best_reverse.insert.x;
-                y = best_reverse.insert.y;
             } else {
                 continue;
             }
@@ -95,17 +95,27 @@ void XGES::heuristic_turn_delete_insert() {
             auto best_insert = std::move(candidate_inserts.back());
             candidate_inserts.pop_back();
 
-            // check if it is still valid
-            if (pdag.is_insert_valid(best_insert)) {
-                // apply the insert
-                pdag.apply_insert(best_insert, changed_edges);
-                total_score += best_insert.score;
-                // log it
-                std::cout << i_operations << ". " << best_insert << std::endl;
+            n_inserts++;
+            if (best_insert.y == last_insert.y && abs(best_insert.score - last_insert.score) < 1e-10 &&
+                best_insert.x == last_insert.x && best_insert.T == last_insert.T) {
+                duplicate_inserts++;
+                continue;
+            }
+            last_insert = std::move(best_insert);
 
-                x = best_insert.x;
-                y = best_insert.y;
+            // check if it is still valid
+            clock_t start_time = clock();
+            if (pdag.is_insert_valid(last_insert)) {
+                // apply the insert
+                statistics["time- is_insert_valid true"] += (double) (clock() - start_time) / CLOCKS_PER_SEC;
+                start_time = clock();
+                pdag.apply_insert(last_insert, changed_edges);
+                statistics["time- apply_insert"] += (double) (clock() - start_time) / CLOCKS_PER_SEC;
+                total_score += last_insert.score;
+                // log it
+                std::cout << i_operations << ". " << last_insert << std::endl;
             } else {
+                statistics["time- is_insert_valid false"] += (double) (clock() - start_time) / CLOCKS_PER_SEC;
                 continue;
             }
         }
@@ -139,6 +149,8 @@ void XGES::heuristic_turn_delete_insert() {
 
         std::cout << "score=" << total_score << std::endl << std::endl;
     }
+    std::cout << "probable_duplicates = " << duplicate_inserts << std::endl;
+    std::cout << "n_inserts = " << n_inserts << std::endl;
 }
 
 
