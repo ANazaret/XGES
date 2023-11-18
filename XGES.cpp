@@ -121,29 +121,53 @@ void XGES::heuristic_turn_delete_insert() {
         }
 
 
-        // Temporary logic to update operators
         std::set<int> touched_nodes;
+        std::set<int> full_insert_to_y;
         for (auto &edge: changed_edges) {
             touched_nodes.insert(edge.x);
             touched_nodes.insert(edge.y);
+            if (edge.type == EdgeType::DIRECTED) {
+                full_insert_to_y.insert(edge.y);
+                std::set_intersection(pdag.get_neighbors(edge.x).begin(), pdag.get_neighbors(edge.x).end(),
+                                      pdag.get_neighbors(edge.y).begin(), pdag.get_neighbors(edge.y).end(),
+                                      std::inserter(full_insert_to_y, full_insert_to_y.begin()));
+
+            } else if (edge.type == EdgeType::UNDIRECTED) {
+                full_insert_to_y.insert(edge.x);
+                full_insert_to_y.insert(edge.y);
+                std::set_intersection(pdag.get_neighbors(edge.x).begin(), pdag.get_neighbors(edge.x).end(),
+                                      pdag.get_neighbors(edge.y).begin(), pdag.get_neighbors(edge.y).end(),
+                                      std::inserter(full_insert_to_y, full_insert_to_y.begin()));
+            } else {
+                full_insert_to_y.insert(edge.x);
+                full_insert_to_y.insert(edge.y);
+            }
         }
 
+        clock_t start_time = clock();
         for (auto node: touched_nodes) {
-            find_inserts_to_y(node, candidate_inserts);
             find_reverse_to_y(node, candidate_reverses);
             find_reverse_from_x(node, candidate_reverses);
             find_deletes_to_y(node, candidate_deletes);
         }
+        for (auto node: full_insert_to_y) { find_inserts_to_y(node, candidate_inserts); }
 
-        for (auto target: pdag.get_neighbors(y)) {
-            if (touched_nodes.find(target) != touched_nodes.end()) { continue; }
-            find_inserts_to_y(target, candidate_inserts, x);
+        for (auto &edge: changed_edges) {
+            for (auto target: pdag.get_neighbors(edge.y)) {
+                if (full_insert_to_y.find(target) != full_insert_to_y.end()) { continue; }
+                find_inserts_to_y(target, candidate_inserts, edge.x);
+            }
+            for (auto target: pdag.get_neighbors(edge.x)) {
+                if (full_insert_to_y.find(target) != full_insert_to_y.end()) { continue; }
+                find_inserts_to_y(target, candidate_inserts, edge.y);
+            }
+            if (full_insert_to_y.find(edge.x) == full_insert_to_y.end()) {
+                for (auto source: pdag.get_adjacent(edge.y)) {
+                    find_inserts_to_y(edge.x, candidate_inserts, source);
+                }
+            }
         }
-
-        for (auto target: pdag.get_neighbors(x)) {
-            if (touched_nodes.find(target) != touched_nodes.end()) { continue; }
-            find_inserts_to_y(target, candidate_inserts, y);
-        }
+        statistics["time- update_operators"] += (double) (clock() - start_time) / CLOCKS_PER_SEC;
 
         i_operations++;
 
@@ -166,7 +190,8 @@ void XGES::heuristic_turn_delete_insert() {
  * @param y
  * @param candidate_inserts
  */
-void XGES::find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts, int parent_x) {
+void XGES::find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts, int parent_x,
+                             bool low_parent_only) {
     auto &adjacent_y = pdag.get_adjacent(y);
     auto &parents_y = pdag.get_parents(y);
 
@@ -185,6 +210,7 @@ void XGES::find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts, int 
 
 
     for (int x: possible_parents) {
+        if (low_parent_only && x > y) { break; }
         // 3. [Ne(y) ∩ Ad(x)] ∪ T is a clique
         // So in particular, [Ne(y) ∩ Ad(x)] must be a clique.
         auto neighbors_y_adjacent_x = pdag.get_neighbors_adjacent(y, x);
