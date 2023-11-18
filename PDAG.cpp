@@ -4,7 +4,7 @@
 #include "PDAG.h"
 #include "set_ops.h"
 
-PDAG::PDAG(int num_nodes) : num_nodes(num_nodes) {
+PDAG::PDAG(int num_nodes) : num_nodes(num_nodes), _block_semi_directed_path_queue(num_nodes) {
     for (int i = 0; i < num_nodes; i++) {
         nodes.push_back(i);
         children.emplace_back();
@@ -15,7 +15,8 @@ PDAG::PDAG(int num_nodes) : num_nodes(num_nodes) {
         node_version.push_back(0);
     }
 
-    //    _block_semi_directed_path_visited.resize(num_nodes);
+    _block_semi_directed_path_visited.resize(num_nodes);
+    _block_semi_directed_path_blocked.resize(num_nodes);
 }
 
 int PDAG::get_number_of_edges() const { return number_of_directed_edges + number_of_undirected_edges; }
@@ -159,26 +160,27 @@ bool PDAG::block_semi_directed_paths(int src, int dst, const std::set<int> &bloc
     statistics["call_block_semi_directed_paths"] += 1;
     if (src == dst) { return false; }
     // BFS search from y to x, using adjacent_reachable edges, avoiding blocked nodes
-    //    auto &visited = _block_semi_directed_path_visited;
-    //    std::fill(visited.begin(), visited.end(), 0);
-    std::vector<char> visited(num_nodes, 0);
+    auto &visited = _block_semi_directed_path_visited;
+    std::fill(visited.begin(), visited.end(), 0);
+    auto &blocked = _block_semi_directed_path_blocked;
+    std::fill(blocked.begin(), blocked.end(), 0);
+
+    for (int n: blocked_nodes) { blocked[n] = 1; }
+
     visited[src] = 1;
 
-    std::queue<int> queue;
-    queue.push(src);
+    auto &queue = _block_semi_directed_path_queue;
+    queue.clear();
+    queue.push_back(src);
 
     while (!queue.empty()) {
-        int node = queue.front();
-        queue.pop();
+        int node = queue.pop_front();
         auto &reachable = get_adjacent_reachable(node);
 
         for (int n: reachable) {
-            if (visited[n] || blocked_nodes.find(n) != blocked_nodes.end() ||
-                (node == src && n == dst && ignore_direct_edge)) {
-                continue;
-            }
+            if (visited[n] || blocked[n] || (node == src && n == dst && ignore_direct_edge)) { continue; }
             if (n == dst) { return false; }
-            queue.push(n);
+            queue.push_back(n);
             visited[n] = 1;
         }
     }

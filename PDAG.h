@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "CircularBuffer.h"
 #include "EdgeQueueSet.h"
 #include "Operators.h"
 #include "set_ops.h"
@@ -39,7 +40,10 @@ private:
     std::vector<int> node_version;
     int graph_version = 0;
     std::vector<std::tuple<PDAGModification, int, int>> modifications_history;
-    //    std::vector<char> _block_semi_directed_path_visited;
+
+    std::vector<char> _block_semi_directed_path_visited;
+    std::vector<char> _block_semi_directed_path_blocked;
+    CircularBuffer<int> _block_semi_directed_path_queue;
 
 public:
     std::map<std::string, double> statistics;
