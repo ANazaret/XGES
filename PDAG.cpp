@@ -55,7 +55,7 @@ const std::set<int> &PDAG::get_neighbors(int node) const { return neighbors[node
 
 const std::set<int> &PDAG::get_adjacent(int node) const { return adjacent[node]; }
 
-const std::set<int> PDAG::get_adjacent_reachable(int node) const { return adjacent_reachable.at(node); }
+const std::set<int> &PDAG::get_adjacent_reachable(int node) const { return adjacent_reachable.at(node); }
 
 std::set<int> PDAG::get_neighbors_adjacent(int node_y, int node_x) const {
     std::set<int> result;

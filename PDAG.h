@@ -71,7 +71,7 @@ public:
 
     const std::set<int> &get_adjacent(int node) const;
 
-    const std::set<int> get_adjacent_reachable(int node) const;
+    const std::set<int> &get_adjacent_reachable(int node) const;
 
     std::set<int> get_neighbors_adjacent(int node_y, int node_x) const;
 
