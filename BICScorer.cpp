@@ -24,13 +24,16 @@ BICScorer::BICScorer(const Eigen::MatrixXd &data, double alpha)
     : data(data), alpha(alpha), covariance_matrix(compute_covariance(data)) {
     n_variables = data.cols();
     n_samples = data.rows();
+    cache.resize(n_variables);
 }
 
 
-double BICScorer::local_score(int target, const std::set<int> &parents) const {
+double BICScorer::local_score(int target, const std::set<int> &parents) {
     // cache lookup
-    auto it = cache.find(std::make_pair(target, parents));
-    if (it != cache.end()) { return it->second; }
+    auto &cache_target = cache[target];
+    auto it = cache_target.find(parents);
+    if (it != cache_target.end()) { return it->second; }
+
     // compute score
     // Extracting 'cov_target_target' value
     double cov_target_target = covariance_matrix(target, target);
@@ -65,6 +68,9 @@ double BICScorer::local_score(int target, const std::set<int> &parents) const {
 
     // Calculating the BIC score
     double bic = log_likelihood_no_constant - bic_regularization;
+
+    // cache update
+    cache_target[parents] = bic;
 
     return bic;
 }

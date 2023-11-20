@@ -6,6 +6,8 @@
 #include <iostream>
 #include <stack>
 
+using namespace std::chrono;
+
 XGES::XGES(const Eigen::MatrixXd &data, ScorerInterface *scorer) : pdag(data.cols()), scorer(scorer) {
     n_variables = data.cols();
     n_samples = data.rows();
@@ -32,12 +34,13 @@ void XGES::heuristic_turn_delete_insert() {
 
     // init the candidate inserts
     std::cout << "n_variables = " << n_variables << std::endl;
-    clock_t start_init_inserts = clock();
+    auto start_init_inserts = high_resolution_clock::now();
     for (int y = 0; y < n_variables; ++y) {
         // find all possible inserts to y
         find_inserts_to_y(y, candidate_inserts, -1, true);
     }
-    statistics["time- init_inserts"] = (double) (clock() - start_init_inserts) / CLOCKS_PER_SEC;
+    statistics["time- init_inserts"] =
+            duration_cast<duration<double>>(high_resolution_clock::now() - start_init_inserts).count();
     std::cout << "candidate_inserts.size() = " << candidate_inserts.size() << std::endl;
 
     int i_operations = 1;
@@ -104,18 +107,21 @@ void XGES::heuristic_turn_delete_insert() {
             last_insert = std::move(best_insert);
 
             // check if it is still valid
-            clock_t start_time = clock();
+            auto start_time = high_resolution_clock::now();
             if (pdag.is_insert_valid(last_insert)) {
                 // apply the insert
-                statistics["time- is_insert_valid true"] += (double) (clock() - start_time) / CLOCKS_PER_SEC;
-                start_time = clock();
+                statistics["time- is_insert_valid true"] +=
+                        duration_cast<duration<double>>(high_resolution_clock::now() - start_time).count();
+                start_time = high_resolution_clock::now();
                 pdag.apply_insert(last_insert, changed_edges);
-                statistics["time- apply_insert"] += (double) (clock() - start_time) / CLOCKS_PER_SEC;
+                statistics["time- apply_insert"] +=
+                        duration_cast<duration<double>>(high_resolution_clock::now() - start_time).count();
                 total_score += last_insert.score;
                 // log it
                 std::cout << i_operations << ". " << last_insert << std::endl;
             } else {
-                statistics["time- is_insert_valid false"] += (double) (clock() - start_time) / CLOCKS_PER_SEC;
+                statistics["time- is_insert_valid false"] +=
+                        duration_cast<duration<double>>(high_resolution_clock::now() - start_time).count();
                 continue;
             }
         }
@@ -144,7 +150,7 @@ void XGES::heuristic_turn_delete_insert() {
             }
         }
 
-        clock_t start_time = clock();
+        auto start_time = high_resolution_clock::now();
         for (auto node: touched_nodes) {
             find_reverse_to_y(node, candidate_reverses);
             find_reverse_from_x(node, candidate_reverses);
@@ -167,7 +173,8 @@ void XGES::heuristic_turn_delete_insert() {
                 }
             }
         }
-        statistics["time- update_operators"] += (double) (clock() - start_time) / CLOCKS_PER_SEC;
+        statistics["time- update_operators"] +=
+                duration_cast<duration<double>>(high_resolution_clock::now() - start_time).count();
 
         i_operations++;
 
@@ -242,9 +249,10 @@ void XGES::find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts, int 
             auto effective_parents = std::get<2>(top);
 
             // change if we parallelize
-            clock_t start = clock();
+            auto start = high_resolution_clock::now();
             double score = scorer->score_insert(y, effective_parents, x);
-            statistics["time- score_insert"] += (double) (clock() - start) / CLOCKS_PER_SEC;
+            statistics["time- score_insert"] +=
+                    duration_cast<duration<double>>(high_resolution_clock::now() - start).count();
             if (score > 0) {
                 candidate_inserts.emplace_back(x, y, T, score, effective_parents);
                 std::push_heap(candidate_inserts.begin(), candidate_inserts.end());

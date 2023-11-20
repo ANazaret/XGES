@@ -4,6 +4,8 @@
 #include "PDAG.h"
 #include "set_ops.h"
 
+using namespace std::chrono;
+
 PDAG::PDAG(int num_nodes) : num_nodes(num_nodes), _block_semi_directed_path_queue(num_nodes) {
     for (int i = 0; i < num_nodes; i++) {
         nodes.push_back(i);
@@ -252,13 +254,15 @@ bool PDAG::is_insert_valid(const Insert &insert, bool reverse) {
 
     // 5. [Ne(y) ∩ Ad(x)] ∪ T block all semi-directed paths from y to x
     bool ignore_direct_edge = reverse;
-    clock_t start = clock();
+    auto start_time = high_resolution_clock::now();
     if (!block_semi_directed_paths(y, x, ne_y_ad_x_T, ignore_direct_edge)) {
         statistics["is_insert_valid: false 5"] += 1;
-        statistics["time- block_semi_directed_paths: false"] += double(clock() - start) / CLOCKS_PER_SEC;
+        statistics["time- block_semi_directed_paths: false"] +=
+                duration_cast<duration<double>>(high_resolution_clock::now() - start_time).count();
         return false;
     }
-    statistics["time- block_semi_directed_paths: true"] += double(clock() - start) / CLOCKS_PER_SEC;
+    statistics["time- block_semi_directed_paths: true"] +=
+            duration_cast<duration<double>>(high_resolution_clock::now() - start_time).count();
 
     return true;
 }

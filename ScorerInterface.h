@@ -10,7 +10,7 @@ class ScorerInterface {
 public:
     virtual ~ScorerInterface() = default;
 
-    virtual double local_score(int target, const std::set<int> &parents) const = 0;
+    virtual double local_score(int target, const std::set<int> &parents) = 0;
 
     double score_insert(int target, const std::set<int> &parents, int parent_to_add) {
         std::set<int> parents_with_new_parent = parents;
