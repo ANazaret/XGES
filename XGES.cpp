@@ -233,9 +233,8 @@ void XGES::find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts, int 
         // The stack contains valid T, and an iterator for the next entries in neighbors_y_not_adjacent_x to consider.
 
         // The effective parents_y are [Ne(y) ∩ Ad(x)] ∪ T ∪ Pa(y).
-        std::set<int> effective_parents_y;
-        std::set_union(neighbors_y_adjacent_x.begin(), neighbors_y_adjacent_x.end(), parents_y.begin(),
-                       parents_y.end(), std::inserter(effective_parents_y, effective_parents_y.begin()));
+        std::set<int> &effective_parents_y = neighbors_y_adjacent_x;
+        effective_parents_y.insert(parents_y.begin(), parents_y.end());
         // <T: set of nodes, iterator over neighbors_y_not_adjacent_x, effective_parents: set of nodes>
         std::stack<std::tuple<std::set<int>, std::set<int>::iterator, std::set<int>>> stack;
         // we know that T = {} is valid
@@ -244,9 +243,9 @@ void XGES::find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts, int 
         while (!stack.empty()) {
             auto top = std::move(stack.top());
             stack.pop();
-            auto T = std::get<0>(top);
+            auto &T = std::get<0>(top);
             auto it = std::get<1>(top);
-            auto effective_parents = std::get<2>(top);
+            auto &effective_parents = std::get<2>(top);
 
             // change if we parallelize
             auto start = high_resolution_clock::now();
@@ -254,6 +253,8 @@ void XGES::find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts, int 
             statistics["time- score_insert"] +=
                     duration_cast<duration<double>>(high_resolution_clock::now() - start).count();
             if (score > 0) {
+                // using move(T)/move(effective_parents) should also work even though we look them up
+                // later. but i play it safe for now.
                 candidate_inserts.emplace_back(x, y, T, score, effective_parents);
                 std::push_heap(candidate_inserts.begin(), candidate_inserts.end());
             }
