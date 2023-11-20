@@ -12,7 +12,7 @@ class Reverse;
 
 class Insert {
 public:
-    Insert(int x, int y, const std::set<int> &T, double score, std::set<int> effective_parents);
+    Insert(int x, int y, const std::set<int> &T, double score, const std::set<int> &effective_parents);
 
     friend std::ostream &operator<<(std::ostream &os, const Insert &obj);
     friend std::ostream &operator<<(std::ostream &os, const Reverse &obj);
@@ -34,7 +34,7 @@ private:
 
 class Delete {
 public:
-    Delete(int x, int y, const std::set<int> &O, double score, std::set<int> effective_parents);
+    Delete(int x, int y, const std::set<int> &O, double score, const std::set<int> &effective_parents);
 
     friend std::ostream &operator<<(std::ostream &os, const Delete &obj);
 
@@ -55,7 +55,7 @@ private:
 
 class Reverse {
 public:
-    Reverse(int x, int y, const std::set<int> &T, double score, std::set<int> effective_parents);
+    Reverse(int x, int y, const std::set<int> &T, double score, const std::set<int> &effective_parents);
     Reverse(Insert insert, double score);
 
     friend std::ostream &operator<<(std::ostream &os, const Reverse &obj);
