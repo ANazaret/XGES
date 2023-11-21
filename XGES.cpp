@@ -37,7 +37,7 @@ void XGES::heuristic_turn_delete_insert() {
     auto start_init_inserts = high_resolution_clock::now();
     for (int y = 0; y < n_variables; ++y) {
         // find all possible inserts to y
-        find_inserts_to_y(y, candidate_inserts, -1, true);
+        find_inserts_to_y(y, candidate_inserts, -1, false);
     }
     statistics["time- init_inserts"] =
             duration_cast<duration<double>>(high_resolution_clock::now() - start_init_inserts).count();
