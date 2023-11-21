@@ -198,7 +198,7 @@ void XGES::heuristic_turn_delete_insert() {
  * @param candidate_inserts
  */
 void XGES::find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts, int parent_x,
-                             bool low_parent_only) {
+                             bool low_parent_only, bool positive_only) {
     auto &adjacent_y = pdag.get_adjacent(y);
     auto &parents_y = pdag.get_parents(y);
 
@@ -252,9 +252,9 @@ void XGES::find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts, int 
             double score = scorer->score_insert(y, effective_parents, x);
             statistics["time- score_insert"] +=
                     duration_cast<duration<double>>(high_resolution_clock::now() - start).count();
-            if (score > 0) {
+            if (score > 0 || !positive_only) {
                 // using move(T)/move(effective_parents) should also work even though we look them up
-                // later. but i play it safe for now.
+                // later. but we play it safe for now.
                 candidate_inserts.emplace_back(x, y, T, score, effective_parents);
                 std::push_heap(candidate_inserts.begin(), candidate_inserts.end());
             }
@@ -367,16 +367,16 @@ void XGES::find_reverse_to_y(int y, std::vector<Reverse> &candidate_reverses) {
     auto &children_y = pdag.get_children(y);
 
     for (int x: children_y) {
-
+        auto &parents_x = pdag.get_parents(x);
         std::vector<Insert> candidate_inserts;
-        find_inserts_to_y(y, candidate_inserts, x);
+        find_inserts_to_y(y, candidate_inserts, x, false, false);
 
         for (auto insert: candidate_inserts) {
             // change if we parallelize
-            double score = insert.score + scorer->score_delete(x, pdag.get_parents(x), y);
+            double score = insert.score + scorer->score_delete(x, parents_x, y);
 
             if (score > 0) {
-                candidate_reverses.emplace_back(insert, score);
+                candidate_reverses.emplace_back(insert, score, parents_x);
                 std::push_heap(candidate_reverses.begin(), candidate_reverses.end());
             }
         }
@@ -391,14 +391,14 @@ void XGES::find_reverse_from_x(int x, std::vector<Reverse> &candidate_reverses) 
     for (int y: parents_x) {
 
         std::vector<Insert> candidate_inserts;
-        find_inserts_to_y(y, candidate_inserts, x);
+        find_inserts_to_y(y, candidate_inserts, x, false, false);
 
         for (auto insert: candidate_inserts) {
             // change if we parallelize
-            double score = insert.score + scorer->score_delete(x, pdag.get_parents(x), y);
+            double score = insert.score + scorer->score_delete(x, parents_x, y);
 
             if (score > 0) {
-                candidate_reverses.emplace_back(insert, score);
+                candidate_reverses.emplace_back(insert, score, parents_x);
                 std::push_heap(candidate_reverses.begin(), candidate_reverses.end());
             }
         }

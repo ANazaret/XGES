@@ -27,10 +27,12 @@ std::ostream &operator<<(std::ostream &os, const Delete &obj) {
     return os;
 }
 
-Reverse::Reverse(Insert insert, double score) : insert(insert), score(score) {}
+Reverse::Reverse(Insert insert, double score, const FlatSet &parents_x)
+    : insert(insert), score(score), parents_x(parents_x) {}
 
-Reverse::Reverse(int x, int y, const FlatSet &T, double score, const FlatSet &effective_parents)
-    : insert(x, y, T, 0, effective_parents), score(score) {}
+Reverse::Reverse(int x, int y, const FlatSet &T, double score, const FlatSet &effective_parents,
+                 const FlatSet &parents_x)
+    : insert(x, y, T, 0, effective_parents), score(score), parents_x(parents_x) {}
 
 std::ostream &operator<<(std::ostream &os, const Reverse &obj) {
     os << "Reverse: " << obj.insert.x << " ← " << obj.insert.y << ", T = {";

@@ -56,8 +56,9 @@ private:
 
 class Reverse {
 public:
-    Reverse(int x, int y, const FlatSet &T, double score, const FlatSet &effective_parents);
-    Reverse(Insert insert, double score);
+    Reverse(int x, int y, const FlatSet &T, double score, const FlatSet &effective_parents,
+            const FlatSet &parents_x);
+    Reverse(Insert insert, double score, const FlatSet &parents_x);
 
     friend std::ostream &operator<<(std::ostream &os, const Reverse &obj);
 
@@ -71,4 +72,5 @@ public:
 private:
     Insert insert;
     double score = 0;
+    FlatSet parents_x;
 };

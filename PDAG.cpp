@@ -267,7 +267,13 @@ bool PDAG::is_insert_valid(const Insert &insert, bool reverse) {
     return true;
 }
 
-bool PDAG::is_reverse_valid(const Reverse &reverse) { return is_insert_valid(reverse.insert, true); }
+bool PDAG::is_reverse_valid(const Reverse &reverse) {
+    // TODO: wrong, need to check if the score to x has changed
+    // is Pa(x) unchanged
+    int x = reverse.insert.x;
+    if (get_parents(x) != reverse.parents_x) { return false; }
+    return is_insert_valid(reverse.insert, true);
+}
 
 bool PDAG::is_delete_valid(const Delete &delet) const {
     // 1. x and y are neighbors or x is a parent of y [aka y is adjacent_reachable from x]
