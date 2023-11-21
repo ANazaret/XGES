@@ -47,7 +47,7 @@ void XGES::heuristic_turn_delete_insert() {
 
     int duplicate_inserts = 0;
     int n_inserts = 0;
-    Insert last_insert(-1, -1, std::set<int>{}, -1, std::set<int>{});
+    Insert last_insert(-1, -1, FlatSet{}, -1, FlatSet{});
 
     // now do the heuristic
     while (!candidate_inserts.empty() || !candidate_reverses.empty() || !candidate_deletes.empty()) {
@@ -233,12 +233,12 @@ void XGES::find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts, int 
         // The stack contains valid T, and an iterator for the next entries in neighbors_y_not_adjacent_x to consider.
 
         // The effective parents_y are [Ne(y) ∩ Ad(x)] ∪ T ∪ Pa(y).
-        std::set<int> &effective_parents_y = neighbors_y_adjacent_x;
+        FlatSet &effective_parents_y = neighbors_y_adjacent_x;// just renaming it, no copy necessary
         effective_parents_y.insert(parents_y.begin(), parents_y.end());
         // <T: set of nodes, iterator over neighbors_y_not_adjacent_x, effective_parents: set of nodes>
-        std::stack<std::tuple<std::set<int>, std::set<int>::iterator, std::set<int>>> stack;
+        std::stack<std::tuple<FlatSet, FlatSet::iterator, FlatSet>> stack;
         // we know that T = {} is valid
-        stack.emplace(std::set<int>{}, neighbors_y_not_adjacent_x.begin(), effective_parents_y);
+        stack.emplace(FlatSet{}, neighbors_y_not_adjacent_x.begin(), effective_parents_y);
 
         while (!stack.empty()) {
             auto top = std::move(stack.top());
@@ -271,9 +271,9 @@ void XGES::find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts, int 
                     std::includes(adjacent_z.begin(), adjacent_z.end(), neighbors_y_adjacent_x.begin(),
                                   neighbors_y_adjacent_x.end())) {
                     // T' is a candidate
-                    std::set<int> T_prime = T;
+                    auto T_prime = T;
                     T_prime.insert(z);
-                    std::set<int> effective_parents_prime = effective_parents;
+                    auto effective_parents_prime = effective_parents;
                     effective_parents_prime.insert(z);
                     stack.emplace(std::move(T_prime), it, std::move(effective_parents_prime));
                 }
@@ -307,9 +307,13 @@ void XGES::find_deletes_to_y(int y, std::vector<Delete> &candidate_deletes) {
 
         // find all possible O ⊆ [Ne(y) ∩ Ad(x)] that are cliques, quite similar to the inserts but simpler
         // <O set of nodes, iterator over neighbors_y_adjacent_x, set of effective_parents>
-        std::stack<std::tuple<std::set<int>, std::set<int>::iterator, std::set<int>>> stack;
+        std::stack<std::tuple<FlatSet, FlatSet::iterator, FlatSet>> stack;
         // we know that O = {} is valid
-        stack.emplace(std::set<int>{}, neighbors_y_adjacent_x.begin(), parents_y);
+        FlatSet effective_parents_init;
+        effective_parents_init.reserve(parents_y.size() + neighbors_y_adjacent_x.size() + 1);
+        // note: Chickering Corrollary 18 is incorrect. Pa(y) might not contain x, it has to be added.
+        union_with_single_element(parents_y, x, effective_parents_init);
+        stack.emplace(FlatSet{}, neighbors_y_adjacent_x.begin(), effective_parents_init);
 
         while (!stack.empty()) {
             auto top = std::move(stack.top());
@@ -335,9 +339,9 @@ void XGES::find_deletes_to_y(int y, std::vector<Delete> &candidate_deletes) {
                 // We check that O ⊆ Ad(z)
                 if (std::includes(adjacent_z.begin(), adjacent_z.end(), O.begin(), O.end())) {
                     // O' is a candidate
-                    std::set<int> O_prime = O;
+                    auto O_prime = O;
                     O_prime.insert(z);
-                    std::set<int> effective_parents_prime = effective_parents;
+                    auto effective_parents_prime = effective_parents;
                     effective_parents_prime.insert(z);
                     stack.emplace(std::move(O_prime), it, std::move(effective_parents_prime));
                 }

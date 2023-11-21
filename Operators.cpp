@@ -4,7 +4,7 @@
 
 #include "Operators.h"
 
-Insert::Insert(int x, int y, const std::set<int> &T, double score, const std::set<int> &effective_parents)
+Insert::Insert(int x, int y, const FlatSet &T, double score, const FlatSet &effective_parents)
     : x(x), y(y), T(T), score(score), effective_parents(effective_parents) {}
 
 std::ostream &operator<<(std::ostream &os, const Insert &obj) {
@@ -17,7 +17,7 @@ std::ostream &operator<<(std::ostream &os, const Insert &obj) {
 }
 
 
-Delete::Delete(int x, int y, const std::set<int> &O, double score, const std::set<int> &effective_parents)
+Delete::Delete(int x, int y, const FlatSet &O, double score, const FlatSet &effective_parents)
     : x(x), y(y), O(O), score(score), effective_parents(effective_parents) {}
 
 std::ostream &operator<<(std::ostream &os, const Delete &obj) {
@@ -29,7 +29,7 @@ std::ostream &operator<<(std::ostream &os, const Delete &obj) {
 
 Reverse::Reverse(Insert insert, double score) : insert(insert), score(score) {}
 
-Reverse::Reverse(int x, int y, const std::set<int> &T, double score, const std::set<int> &effective_parents)
+Reverse::Reverse(int x, int y, const FlatSet &T, double score, const FlatSet &effective_parents)
     : insert(x, y, T, 0, effective_parents), score(score) {}
 
 std::ostream &operator<<(std::ostream &os, const Reverse &obj) {

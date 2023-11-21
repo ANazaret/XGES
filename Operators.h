@@ -4,15 +4,17 @@
 
 #pragma once
 
-#include "ScorerInterface.h"
+
+#include "set_ops.h"
 #include <iostream>
 #include <set>
 
 class Reverse;
 
+
 class Insert {
 public:
-    Insert(int x, int y, const std::set<int> &T, double score, const std::set<int> &effective_parents);
+    Insert(int x, int y, const FlatSet &T, double score, const FlatSet &effective_parents);
 
     friend std::ostream &operator<<(std::ostream &os, const Insert &obj);
     friend std::ostream &operator<<(std::ostream &os, const Reverse &obj);
@@ -26,15 +28,14 @@ public:
 
 private:
     int x, y;
-    std::set<int> T;
-    std::set<int> effective_parents;// = [Ne(y) ∩ Ad(x)] ∪ T ∪ Pa(y)
+    FlatSet T;
+    FlatSet effective_parents;// = [Ne(y) ∩ Ad(x)] ∪ T ∪ Pa(y)
     double score = 0;
 };
 
-
 class Delete {
 public:
-    Delete(int x, int y, const std::set<int> &O, double score, const std::set<int> &effective_parents);
+    Delete(int x, int y, const FlatSet &O, double score, const FlatSet &effective_parents);
 
     friend std::ostream &operator<<(std::ostream &os, const Delete &obj);
 
@@ -47,15 +48,15 @@ public:
 
 private:
     int x, y;
-    std::set<int> O;
-    std::set<int> effective_parents;// O ∪ Pa(y)
+    FlatSet O;
+    FlatSet effective_parents;// O ∪ Pa(y)
     double score = 0;
 };
 
 
 class Reverse {
 public:
-    Reverse(int x, int y, const std::set<int> &T, double score, const std::set<int> &effective_parents);
+    Reverse(int x, int y, const FlatSet &T, double score, const FlatSet &effective_parents);
     Reverse(Insert insert, double score);
 
     friend std::ostream &operator<<(std::ostream &os, const Reverse &obj);

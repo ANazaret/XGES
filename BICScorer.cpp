@@ -28,7 +28,7 @@ BICScorer::BICScorer(const Eigen::MatrixXd &data, double alpha)
 }
 
 
-double BICScorer::local_score(int target, const std::set<int> &parents) {
+double BICScorer::local_score(int target, const FlatSet &parents) {
     // cache lookup
     auto &cache_target = cache[target];
     auto it = cache_target.find(parents);

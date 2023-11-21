@@ -27,38 +27,36 @@ int PDAG::get_node_version(int node) const { return node_version.at(node); }
 
 const std::vector<int> &PDAG::get_nodes() const { return nodes; }
 
-// TODO: Find where this is used and potentially change it to std::vector<std::pair<int, int>>.
-std::set<std::pair<int, int>> PDAG::get_directed_edges() const {
-    std::set<std::pair<int, int>> edges;
+std::vector<std::pair<int, int>> PDAG::get_directed_edges() const {
+    std::vector<std::pair<int, int>> edges;
     for (const auto &node: nodes) {
-        for (int child: children.at(node)) { edges.insert({node, child}); }
+        for (int child: children.at(node)) { edges.emplace_back(node, child); }
     }
     return edges;
 }
 
-// TODO: Find where this is used and potentially change it to std::vector<std::pair<int, int>>.
-std::set<std::pair<int, int>> PDAG::get_undirected_edges() const {
-    std::set<std::pair<int, int>> edges;
+std::vector<std::pair<int, int>> PDAG::get_undirected_edges() const {
+    std::vector<std::pair<int, int>> edges;
     for (const auto &node: nodes) {
         for (int neighbor: neighbors.at(node)) {
-            if (node < neighbor) { edges.insert({node, neighbor}); }
+            if (node < neighbor) { edges.emplace_back(node, neighbor); }
         }
     }
     return edges;
 }
 
-const std::set<int> &PDAG::get_parents(int node) const { return parents[node]; }
+const FlatSet &PDAG::get_parents(int node) const { return parents[node]; }
 
-const std::set<int> &PDAG::get_children(int node) const { return children[node]; }
+const FlatSet &PDAG::get_children(int node) const { return children[node]; }
 
-const std::set<int> &PDAG::get_neighbors(int node) const { return neighbors[node]; }
+const FlatSet &PDAG::get_neighbors(int node) const { return neighbors[node]; }
 
-const std::set<int> &PDAG::get_adjacent(int node) const { return adjacent[node]; }
+const FlatSet &PDAG::get_adjacent(int node) const { return adjacent[node]; }
 
-const std::set<int> &PDAG::get_adjacent_reachable(int node) const { return adjacent_reachable.at(node); }
+const FlatSet &PDAG::get_adjacent_reachable(int node) const { return adjacent_reachable.at(node); }
 
-std::set<int> PDAG::get_neighbors_adjacent(int node_y, int node_x) const {
-    std::set<int> result;
+FlatSet PDAG::get_neighbors_adjacent(int node_y, int node_x) const {
+    FlatSet result;
     const auto &neighbors_set = get_neighbors(node_y);
     const auto &adjacent_set = get_adjacent(node_x);
     std::set_intersection(neighbors_set.begin(), neighbors_set.end(), adjacent_set.begin(),
@@ -66,8 +64,8 @@ std::set<int> PDAG::get_neighbors_adjacent(int node_y, int node_x) const {
     return result;
 }
 
-std::set<int> PDAG::get_neighbors_not_adjacent(int node_y, int node_x) const {
-    std::set<int> result;
+FlatSet PDAG::get_neighbors_not_adjacent(int node_y, int node_x) const {
+    FlatSet result;
     const auto &neighbors_set = get_neighbors(node_y);
     const auto &adjacent_set = get_adjacent(node_x);
     std::set_difference(neighbors_set.begin(), neighbors_set.end(), adjacent_set.begin(), adjacent_set.end(),
@@ -75,9 +73,9 @@ std::set<int> PDAG::get_neighbors_not_adjacent(int node_y, int node_x) const {
     return result;
 }
 
-bool PDAG::is_clique(const std::set<int> &nodes_subset) const {
+bool PDAG::is_clique(const FlatSet &nodes_subset) const {
     for (int node1: nodes_subset) {
-        const std::set<int> &adjacent_set = get_adjacent(node1);
+        const FlatSet &adjacent_set = get_adjacent(node1);
         for (int node2: nodes_subset) {
             if (node1 != node2 && adjacent_set.find(node2) == adjacent_set.end()) { return false; }
         }
@@ -157,7 +155,7 @@ void PDAG::add_undirected_edge(int x, int y) {
  * @param blocked_nodes The set of nodes that are blocked
  * @return `true` if blocked_nodes block all semi-directed paths from src to dst, `false` otherwise.
  */
-bool PDAG::block_semi_directed_paths(int src, int dst, const std::set<int> &blocked_nodes,
+bool PDAG::block_semi_directed_paths(int src, int dst, const FlatSet &blocked_nodes,
                                      bool ignore_direct_edge) {
     statistics["call- block_semi_directed_paths"] += 1;
     if (src == dst) { return false; }
@@ -237,9 +235,11 @@ bool PDAG::is_insert_valid(const Insert &insert, bool reverse) {
 
     // 3. [Ne(y) ∩ Ad(x)] ∪ T ∪ Pa(y) has not changed
     // <=> insert.effective_parents == [Ne(y) ∩ Ad(x)] ∪ T ∪ Pa(y)
-    auto ne_y_ad_x_T = neighbors_y;
+    FlatSet ne_y_ad_x_T;
     // intersect effective_parents with Ad(x)
-    intersect_in_place(ne_y_ad_x_T, adjacent_x);
+    std::set_intersection(neighbors_y.begin(), neighbors_y.end(), adjacent_x.begin(), adjacent_x.end(),
+                          std::inserter(ne_y_ad_x_T, ne_y_ad_x_T.begin()));
+    // todo: can easily be improved by doing the insertion manually with intersection
     ne_y_ad_x_T.insert(T.begin(), T.end());
     if (!equal_union(insert.effective_parents, ne_y_ad_x_T, parents.at(y))) {
         statistics["is_insert_valid: false 3"] += 1;
@@ -391,8 +391,12 @@ void PDAG::apply_delete(const Delete &aDelete, std::set<Edge> &changed_edges) {
     }
 
     // H = Ne(y) ∩ Ad(x) \ O
-    std::set<int> H = get_neighbors(aDelete.y);
-    intersect_in_place(H, get_adjacent(aDelete.x));
+    FlatSet H;
+    const auto &neighbors_y = get_neighbors(aDelete.y);
+    const auto &adjacent_x = get_adjacent(aDelete.x);
+    std::set_intersection(neighbors_y.begin(), neighbors_y.end(), adjacent_x.begin(), adjacent_x.end(),
+                          std::inserter(H, H.begin()));
+    // TODO: can easily be improved by doing deletion with intersection
     for (int z: aDelete.O) { H.erase(z); }
 
 
@@ -491,9 +495,12 @@ bool PDAG::is_oriented_by_meek_rule_2(int x, int y) const {
  */
 bool PDAG::is_oriented_by_meek_rule_3(int x, int y) const {
     // 1. z - x and w - x
-    auto candidates_z_w = neighbors.at(x);
+    const auto &neighbors_x = neighbors.at(x);
+    const auto &parent_y = parents.at(y);
+    FlatSet candidates_z_w;
     // 2. z → y and w → y
-    intersect_in_place(candidates_z_w, parents.at(y));
+    std::set_intersection(neighbors_x.begin(), neighbors_x.end(), parent_y.begin(), parent_y.end(),
+                          std::inserter(candidates_z_w, candidates_z_w.begin()));
     for (auto candidate_z: candidates_z_w) {
         for (auto candidate_w: candidates_z_w) {
             // 3. z ≠ w
