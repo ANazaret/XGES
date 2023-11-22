@@ -55,7 +55,7 @@ void XGES::heuristic_turn_delete_insert() {
         // Apply only one operator per iteration
         int x = -1;
         int y = -1;
-
+        bool reverse = false;
         std::set<Edge> changed_edges;
 
         if (!candidate_deletes.empty()) {
@@ -86,6 +86,7 @@ void XGES::heuristic_turn_delete_insert() {
                 // apply the reverse
                 pdag.apply_reverse(best_reverse, changed_edges);
                 total_score += best_reverse.score;
+                reverse = true;
                 // log it
                 std::cout << i_operations << ". " << best_reverse << std::endl;
             } else {
@@ -134,6 +135,7 @@ void XGES::heuristic_turn_delete_insert() {
             touched_nodes.insert(edge.y);
             if (edge.type == EdgeType::DIRECTED) {
                 full_insert_to_y.insert(edge.y);
+                if (reverse) { full_insert_to_y.insert(edge.x); }
                 std::set_intersection(pdag.get_neighbors(edge.x).begin(), pdag.get_neighbors(edge.x).end(),
                                       pdag.get_neighbors(edge.y).begin(), pdag.get_neighbors(edge.y).end(),
                                       std::inserter(full_insert_to_y, full_insert_to_y.begin()));
