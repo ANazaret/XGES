@@ -7,8 +7,26 @@
 #include "ScorerInterface.h"
 #include <Eigen/Dense>
 #include <map>
+#include <set>
+#include <unordered_map>
+#include <vector>
 
 using Eigen::MatrixXd;
+
+
+// Specialize std::hash for std::set<int>
+namespace std {
+    template<>
+    struct hash<FlatSet> {
+        size_t operator()(const FlatSet &s) const {
+            size_t hash_value = 0;
+            for (const int &elem: s) {
+                hash_value ^= hash<int>{}(elem) + 0x9e3779b9 + (hash_value << 6) + (hash_value >> 2);
+            }
+            return hash_value;
+        }
+    };
+}// namespace std
 
 class BICScorer : public ScorerInterface {
 private:
@@ -19,12 +37,11 @@ private:
     const MatrixXd covariance_matrix;
 
     // implement a cache for the local_score function: map from (target, parents) to score
-    std::map<std::pair<int, std::set<int>>, double> cache;
+    //    std::map<std::pair<int, std::set<int>>, double> cache;
+    std::vector<std::unordered_map<FlatSet, double>> cache;
 
 
 public:
     BICScorer(const MatrixXd &data, double alpha);
-    double local_score(int target, const std::set<int> &parents) const;
-
-    double local_diff_score(int target, const std::set<int> &parents, int new_parent) const override;
+    double local_score(int target, const FlatSet &parents) override;
 };

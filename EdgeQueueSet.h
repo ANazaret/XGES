@@ -7,7 +7,7 @@
 #include <queue>
 #include <set>
 
-enum class EdgeType { DIRECTED = 1, UNDIRECTED = 2 };
+enum class EdgeType { DIRECTED = 1, UNDIRECTED = 2, NONE = 3 };
 
 struct Edge {
     int x, y;

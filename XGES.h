@@ -31,8 +31,16 @@ public:
 
     double get_score() const;
 
-    PDAG get_pdag() const;
+    const PDAG &get_pdag() const;
 
+    void find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts, int parent_x = -1,
+                           bool low_parent_only = false, bool positive_only = true);
 
-    void find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts);
+    void find_deletes_to_y(int y, std::vector<Delete> &candidate_deletes);
+
+    void find_reverse_to_y(int y, std::vector<Reverse> &candidate_reverses);
+
+    void find_reverse_from_x(int x, std::vector<Reverse> &candidate_reverses);
+
+    std::map<std::string, double> statistics;
 };

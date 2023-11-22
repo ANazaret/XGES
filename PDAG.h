@@ -4,8 +4,11 @@
 
 #pragma once
 
+#include "CircularBuffer.h"
 #include "EdgeQueueSet.h"
-#include "Insert.h"
+#include "Operators.h"
+#include "set_ops.h"
+#include <map>
 #include <queue>
 #include <set>
 #include <tuple>
@@ -23,13 +26,13 @@ enum class PDAGModification {
 // Declare the PDAG class.
 class PDAG {
 private:
-    int num_nodes;
+    const int num_nodes;
     std::vector<int> nodes;
-    std::vector<std::set<int>> children;
-    std::vector<std::set<int>> parents;
-    std::vector<std::set<int>> neighbors;
-    std::vector<std::set<int>> adjacent;
-    std::vector<std::set<int>> adjacent_reachable;
+    std::vector<FlatSet> children;
+    std::vector<FlatSet> parents;
+    std::vector<FlatSet> neighbors;
+    std::vector<FlatSet> adjacent;
+    std::vector<FlatSet> adjacent_reachable;
 
     int number_of_undirected_edges = 0;
     int number_of_directed_edges = 0;
@@ -38,7 +41,13 @@ private:
     int graph_version = 0;
     std::vector<std::tuple<PDAGModification, int, int>> modifications_history;
 
+    std::vector<char> _block_semi_directed_path_visited;
+    std::vector<char> _block_semi_directed_path_blocked;
+    CircularBuffer<int> _block_semi_directed_path_queue;
+
 public:
+    std::map<std::string, double> statistics;
+
     explicit PDAG(int num_nodes);
 
     /**
@@ -50,23 +59,23 @@ public:
 
     int get_node_version(int node) const;
 
-    std::set<std::pair<int, int>> get_directed_edges() const;
+    std::vector<std::pair<int, int>> get_directed_edges() const;
 
-    std::set<std::pair<int, int>> get_undirected_edges() const;
+    std::vector<std::pair<int, int>> get_undirected_edges() const;
 
-    const std::set<int> &get_parents(int node) const;
+    const FlatSet &get_parents(int node) const;
 
-    const std::set<int> &get_children(int node) const;
+    const FlatSet &get_children(int node) const;
 
-    const std::set<int> &get_neighbors(int node) const;
+    const FlatSet &get_neighbors(int node) const;
 
-    const std::set<int> &get_adjacent(int node) const;
+    const FlatSet &get_adjacent(int node) const;
 
-    const std::set<int> get_adjacent_reachable(int node) const;
+    const FlatSet &get_adjacent_reachable(int node) const;
 
-    std::set<int> get_neighbors_adjacent(int node_y, int node_x) const;
+    FlatSet get_neighbors_adjacent(int node_y, int node_x) const;
 
-    bool is_clique(const std::set<int> &nodes) const;
+    bool is_clique(const FlatSet &nodes) const;
 
     bool has_directed_edge(int x, int y) const;
 
@@ -80,11 +89,18 @@ public:
 
     void add_undirected_edge(int x, int y);
 
-    bool is_insert_valid(const Insert &insert) const;
+    bool is_insert_valid(const Insert &insert, bool reverse = false);
 
-    bool block_semi_directed_paths(int src, int dst, const std::set<int> &blocked_nodes) const;
+    bool is_reverse_valid(const Reverse &reverse);
 
-    void apply_insert(const Insert &insert);
+    bool is_delete_valid(const Delete &delet) const;
+
+    bool block_semi_directed_paths(int src, int dst, const FlatSet &blocked_nodes,
+                                   bool ignore_direct_edge = false);
+
+    void apply_insert(const Insert &insert, std::set<Edge> &changed_edges);
+    void apply_reverse(const Reverse &reverse, std::set<Edge> &changed_edges);
+    void apply_delete(const Delete &delet, std::set<Edge> &changed_edges);
 
     void maintain_cpdag(EdgeQueueSet &edges_to_check, std::set<Edge> &changed_edges);
 
@@ -99,7 +115,7 @@ public:
 
     const std::vector<int> &get_nodes() const;
 
-    std::set<int> get_neighbors_not_adjacent(int node_y, int node_x) const;
+    FlatSet get_neighbors_not_adjacent(int node_y, int node_x) const;
 
     friend std::ostream &operator<<(std::ostream &os, const PDAG &obj);
 
