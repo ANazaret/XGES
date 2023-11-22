@@ -7,7 +7,7 @@
 #include <queue>
 #include <set>
 
-enum class EdgeType { DIRECTED = 1, UNDIRECTED = 2, NONE = 3 };
+enum class EdgeType { UNDIRECTED = 2, NONE = 3, DIRECTED_TO_X = 4, DIRECTED_TO_Y = 5 };
 
 struct Edge {
     int x, y;
@@ -36,4 +36,45 @@ public:
     Edge pop();
 
     bool empty() const;
+};
+
+
+class EdgeModification {
+public:
+    int x, y;// always x < y
+    EdgeType old_type, new_type;
+
+    EdgeModification(int x, int y, EdgeType old_type, EdgeType new_type);
+
+    bool is_now_reverse() const;
+
+    bool is_now_directed() const;
+
+    bool is_now_undirected() const;
+
+    int get_target() const;
+
+    int get_source() const;
+};
+
+#include <map>
+
+class EdgeModificationsMap {
+public:
+    void update_edge_directed(int x, int y, EdgeType old_type);
+    void update_edge_undirected(int x, int y, EdgeType old_type);
+    void update_edge_none(int x, int y, EdgeType old_type);
+
+    std::vector<EdgeModification> get_edge_modifications() const;
+
+    void clear();
+
+    std::map<std::pair<int, int>, EdgeModification>::iterator begin();
+    
+    std::map<std::pair<int, int>, EdgeModification>::iterator end();
+
+
+private:
+    void update_edge_modification(int small, int big, EdgeType old_type, EdgeType new_type);
+    std::map<std::pair<int, int>, EdgeModification> edge_modifications;
 };

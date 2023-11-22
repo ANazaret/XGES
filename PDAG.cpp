@@ -307,7 +307,7 @@ bool PDAG::is_delete_valid(const Delete &delet) const {
  *
  * @param insert
  */
-void PDAG::apply_insert(const Insert &insert, std::set<Edge> &changed_edges) {
+void PDAG::apply_insert(const Insert &insert, EdgeModificationsMap &edge_modifications_map) {
     int x = insert.x;
     int y = insert.y;
     auto &T = insert.T;
@@ -322,13 +322,13 @@ void PDAG::apply_insert(const Insert &insert, std::set<Edge> &changed_edges) {
     if (!T.empty()) {
         // 1. insert the directed edge x → y
         add_directed_edge(x, y);
-        changed_edges.insert({x, y, EdgeType::DIRECTED});
+        edge_modifications_map.update_edge_directed(x, y, EdgeType::NONE);
 
         // 2. for each t ∈ T: orient the (previously undirected) edge between t and y as t → y
         for (int t: T) {
             remove_undirected_edge(t, y);
             add_directed_edge(t, y);
-            changed_edges.insert({t, y, EdgeType::DIRECTED});
+            edge_modifications_map.update_edge_directed(t, y, EdgeType::UNDIRECTED);
         }
 
         // only now:
@@ -344,13 +344,13 @@ void PDAG::apply_insert(const Insert &insert, std::set<Edge> &changed_edges) {
             add_directed_edge(x, y);
             edges_to_check.push_directed(x, y);
             add_edges_around(x, y, edges_to_check, true);
-            changed_edges.insert({x, y, EdgeType::DIRECTED});
+            edge_modifications_map.update_edge_directed(x, y, EdgeType::NONE);
         } else {
             // 2. insert the undirected edge x - y
             add_undirected_edge(x, y);
             edges_to_check.push_undirected(x, y);
             add_edges_around(x, y, edges_to_check, false);
-            changed_edges.insert({x, y, EdgeType::UNDIRECTED});
+            edge_modifications_map.update_edge_undirected(x, y, EdgeType::NONE);
         }
     }
 
@@ -362,7 +362,7 @@ void PDAG::apply_insert(const Insert &insert, std::set<Edge> &changed_edges) {
     // but i can do better
     // If x → y, then don't need to update the edges going to x
 
-    maintain_cpdag(edges_to_check, changed_edges);
+    maintain_cpdag(edges_to_check, edge_modifications_map);
 
     // End: The graph is a CPDAG
     // print changed edges
@@ -373,7 +373,7 @@ void PDAG::apply_insert(const Insert &insert, std::set<Edge> &changed_edges) {
     //    std::cout << std::endl;
 }
 
-void PDAG::apply_reverse(const Reverse &reverse, std::set<Edge> &changed_edges) {
+void PDAG::apply_reverse(const Reverse &reverse, EdgeModificationsMap &edge_modifications_map) {
     // Start: The graph is a CPDAG
 
     // todo: if we change the tracking of the edges, we'll have to add y → x here
@@ -381,19 +381,20 @@ void PDAG::apply_reverse(const Reverse &reverse, std::set<Edge> &changed_edges) 
     int x = reverse.insert.x;
     int y = reverse.insert.y;
     remove_directed_edge(y, x);
-    apply_insert(reverse.insert, changed_edges);
+    edge_modifications_map.update_edge_none(x, y, EdgeType::DIRECTED_TO_X);
+    apply_insert(reverse.insert, edge_modifications_map);
 }
 
-void PDAG::apply_delete(const Delete &aDelete, std::set<Edge> &changed_edges) {
+void PDAG::apply_delete(const Delete &aDelete, EdgeModificationsMap &edge_modifications_map) {
     // Start: The graph is a CPDAG
     if (has_directed_edge(aDelete.x, aDelete.y)) {
         // 1. remove the directed edge x → y
         remove_directed_edge(aDelete.x, aDelete.y);
-        changed_edges.insert({aDelete.x, aDelete.y, EdgeType::NONE});
+        edge_modifications_map.update_edge_none(aDelete.x, aDelete.y, EdgeType::DIRECTED_TO_Y);
     } else {
         // 1. remove the undirected edge x - y
         remove_undirected_edge(aDelete.x, aDelete.y);
-        changed_edges.insert({aDelete.x, aDelete.y, EdgeType::NONE});
+        edge_modifications_map.update_edge_none(aDelete.x, aDelete.y, EdgeType::UNDIRECTED);
     }
 
     // H = Ne(y) ∩ Ad(x) \ O
@@ -412,12 +413,12 @@ void PDAG::apply_delete(const Delete &aDelete, std::set<Edge> &changed_edges) {
     for (int h: H) {
         remove_undirected_edge(aDelete.y, h);
         add_directed_edge(aDelete.y, h);
-        changed_edges.insert({aDelete.y, h, EdgeType::DIRECTED});
+        edge_modifications_map.update_edge_directed(aDelete.y, h, EdgeType::UNDIRECTED);
 
         if (has_undirected_edge(aDelete.x, h)) {
             remove_undirected_edge(aDelete.x, h);
             add_directed_edge(aDelete.x, h);
-            changed_edges.insert({aDelete.x, h, EdgeType::DIRECTED});
+            edge_modifications_map.update_edge_directed(aDelete.x, h, EdgeType::UNDIRECTED);
         }
     }
     EdgeQueueSet edges_to_check;
@@ -427,7 +428,7 @@ void PDAG::apply_delete(const Delete &aDelete, std::set<Edge> &changed_edges) {
         add_edges_around(h, aDelete.y, edges_to_check, true);
         add_edges_around(aDelete.x, h, edges_to_check, true);// shouldnt make a difference
     }
-    maintain_cpdag(edges_to_check, changed_edges);
+    maintain_cpdag(edges_to_check, edge_modifications_map);
 }
 
 
@@ -559,15 +560,16 @@ bool PDAG::is_part_of_v_structure(int x, int y) const {
  *
  * @param insert
  */
-void PDAG::maintain_cpdag(EdgeQueueSet &edges_to_check, std::set<Edge> &changed_edges) {
+void PDAG::maintain_cpdag(EdgeQueueSet &edges_to_check, EdgeModificationsMap &edge_modifications_map) {
     // need to keep track of the modifications made to the graph
 
     while (!edges_to_check.empty()) {
         Edge edge = edges_to_check.pop();
         int x = edge.x;
         int y = edge.y;
+        bool new_is_directed;
 
-        if (edge.type == EdgeType::DIRECTED) {
+        if (edge.type == EdgeType::DIRECTED_TO_Y) {
             // Check if the edge is still directed
             if (is_part_of_v_structure(x, y) || is_oriented_by_meek_rule_1(x, y) ||
                 is_oriented_by_meek_rule_2(x, y) || is_oriented_by_meek_rule_3(x, y)) {
@@ -577,10 +579,14 @@ void PDAG::maintain_cpdag(EdgeQueueSet &edges_to_check, std::set<Edge> &changed_
             // The edge is not directed anymore
             remove_directed_edge(x, y);
             add_undirected_edge(x, y);
+            edge_modifications_map.update_edge_undirected(x, y, edge.type);
+            new_is_directed = false;
         } else {
+            assert(edge.type != EdgeType::DIRECTED_TO_X && edge.type != EdgeType::NONE);
             // Check if the edge is now directed
             if (is_oriented_by_meek_rule_1(x, y) || is_oriented_by_meek_rule_2(x, y) ||
                 is_oriented_by_meek_rule_3(x, y)) {
+
                 // The edge is now directed
             } else if (is_oriented_by_meek_rule_1(y, x) || is_oriented_by_meek_rule_2(y, x) ||
                        is_oriented_by_meek_rule_3(y, x)) {
@@ -590,40 +596,17 @@ void PDAG::maintain_cpdag(EdgeQueueSet &edges_to_check, std::set<Edge> &changed_
                 // The edge is still undirected
                 continue;
             }
+            // The edge is now directed
             remove_undirected_edge(x, y);
             add_directed_edge(x, y);
+            // the edge was undirected
+            assert(edge.type == EdgeType::UNDIRECTED);
+            edge_modifications_map.update_edge_directed(x, y, edge.type);
+            new_is_directed = true;
         }
         // If we reach this point, the edge has been modified
-
-        // remove the edge with its old type if it was in the list of changed edges
-        changed_edges.erase(
-                edge);// TODO: if the edge is undirected, we need to check if (v,u) is in changed_edges
-        // Add the edge to the list of changed edges, with its new type
-        EdgeType new_type = edge.type == EdgeType::UNDIRECTED ? EdgeType::DIRECTED : EdgeType::UNDIRECTED;
-        changed_edges.insert({x, y, new_type});
-
-        //        UnorderedPair edge_unordered = {x, y};
-        //        if (const auto edge_modification = edge_modifications.find(edge_unordered);
-        //            edge_modification != edge_modifications.end()) {
-        //            // the edge was already modified
-        //            // we need to update the type of the edge modification
-        //            auto old_type = edge_modification->second.type;
-        //            if (old_type == EdgeModificationType::NONE_TO_DIRECTED) {
-        //                assert(edge.type == EdgeType::DIRECTED);
-        //                edge_modification->second.type = EdgeModificationType::NONE_TO_UNDIRECTED;
-        //            } else if (old_type == EdgeModificationType::NONE_TO_UNDIRECTED) {
-        //                assert(edge.type == EdgeType::UNDIRECTED);
-        //                edge_modification->second.type = EdgeModificationType::NONE_TO_DIRECTED;
-        //            } else {
-        //                // we delete the edge as it is not modified anymore
-        //                edge_modifications.erase(edge_unordered);
-        //            }
-        //        }
-        //        auto new_type = (edge.type == EdgeType::DIRECTED) ? EdgeType::UNDIRECTED : EdgeType::DIRECTED;
-
-        // We have updated edge (x, y)
         // We need to check the adjacent edges that might be affected by this update
-        add_edges_around(x, y, edges_to_check, new_type == EdgeType::DIRECTED);
+        add_edges_around(x, y, edges_to_check, new_is_directed);
     }
 }
 

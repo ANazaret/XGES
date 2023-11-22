@@ -11,11 +11,10 @@ int main() {
     srand(0);
     // read MatrixXd from file
     //save it to file
-    cnpy::NpyArray arr = cnpy::npy_load("arr4.npy");
+    cnpy::NpyArray arr = cnpy::npy_load("arr5.npy");
     RowMajorMatrixXd m = Eigen::Map<RowMajorMatrixXd>(arr.data<double>(), arr.shape[0], arr.shape[1]);
 
     BICScorer scorer(m, 1);
-    //    std::cout << scorer.local_diff_score(4, {0}, 3) << std::endl;
 
     XGES xges(m, &scorer);
 

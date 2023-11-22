@@ -98,11 +98,13 @@ public:
     bool block_semi_directed_paths(int src, int dst, const FlatSet &blocked_nodes,
                                    bool ignore_direct_edge = false);
 
-    void apply_insert(const Insert &insert, std::set<Edge> &changed_edges);
-    void apply_reverse(const Reverse &reverse, std::set<Edge> &changed_edges);
-    void apply_delete(const Delete &delet, std::set<Edge> &changed_edges);
+    void apply_insert(const Insert &insert, EdgeModificationsMap &edge_modifications_map);
 
-    void maintain_cpdag(EdgeQueueSet &edges_to_check, std::set<Edge> &changed_edges);
+    void apply_reverse(const Reverse &reverse, EdgeModificationsMap &edge_modifications_map);
+
+    void apply_delete(const Delete &delet, EdgeModificationsMap &edge_modifications_map);
+
+    void maintain_cpdag(EdgeQueueSet &edges_to_check, EdgeModificationsMap &edge_modifications_map);
 
     bool is_oriented_by_meek_rule_1(int x, int y) const;
 
