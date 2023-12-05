@@ -23,6 +23,7 @@ add_executable(
         BICScorer.cpp
         BICScorer.h
         CircularBuffer.h
+        dependencies/cxxopts.hpp
 )
 
 # Include library headers
