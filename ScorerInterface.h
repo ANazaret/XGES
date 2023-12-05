@@ -5,6 +5,7 @@
 #pragma once
 
 #include "Operators.h"
+#include "PDAG.h"
 #include <set>
 
 class ScorerInterface {
@@ -32,5 +33,12 @@ public:
         }
         double score_without_old_parent = local_score(target, parents_without_old_parent);
         return score_without_old_parent - score_with_old_parent;
+    }
+
+    double score_pdag(const PDAG &pdag) {
+        double score = 0;
+        PDAG dag = pdag.get_dag_extension();
+        for (int target: dag.get_nodes()) { score += local_score(target, dag.get_parents(target)); }
+        return score;
     }
 };

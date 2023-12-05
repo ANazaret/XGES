@@ -49,4 +49,11 @@ public:
         front_idx = 0;
         back_idx = 0;
     }
+
+    CircularBuffer<T>(const CircularBuffer<T> &other)
+        : buffer(std::unique_ptr<T[]>(new T[other.max_size])), max_size(other.max_size) {
+        front_idx = other.front_idx;
+        back_idx = other.back_idx;
+        std::copy(other.buffer.get(), other.buffer.get() + max_size, buffer.get());
+    }
 };

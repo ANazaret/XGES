@@ -610,6 +610,94 @@ void PDAG::maintain_cpdag(EdgeQueueSet &edges_to_check, EdgeModificationsMap &ed
     }
 }
 
+PDAG PDAG::get_dag_extension() const {
+    PDAG dag_extension = *this;
+    PDAG dag_tmp = *this;
+    std::set<int> nodes_tmp(nodes.begin(), nodes.end());
+
+    while (nodes_tmp.size() > 0) {
+        // find a node x that:
+        // 1. has no children (children[x] = ∅)
+        // 2. For every neighbor y of x, y is adjacent to all the other vertices which are adjacent to x;
+        // ∀y ∈ Ne(x) : Ad(x)\{y} ⊆ Ad(y)  i.e. ∀y ∈ Ne(x) : Ad(x) ⊆ Ad(y) ∪ {y}
+        int x = -1;
+
+        for (int node: nodes_tmp) {
+            if (dag_tmp.get_children(node).empty()) {
+                bool is_dag_extension = true;
+                for (int neighbor: dag_tmp.get_neighbors(node)) {
+                    auto adjacent_neighbor = dag_tmp.get_adjacent(neighbor);
+                    adjacent_neighbor.insert(neighbor);
+                    if (!is_subset(dag_tmp.get_adjacent(node), adjacent_neighbor)) {
+                        is_dag_extension = false;
+                        break;
+                    }
+                }
+                if (is_dag_extension) {
+                    x = node;
+                    break;
+                }
+            }
+        }
+        if (x == -1) {
+            // raise error, no consistent extension possible
+            std::cout << "no consistent extension possible" << std::endl;
+            // todo: raise error
+            break;
+        }
+        // Let all the edges which are adjacent to x in dag_tmp be directed toward x in dag_extension
+        // node_tmp := node_tmp - x
+        // dag_tmp: remove all edges incident to x
+        // Have to be very careful with iterators here
+        while (!dag_tmp.get_neighbors(x).empty()) {
+            int neighbor = *dag_tmp.get_neighbors(x).begin();
+            dag_tmp.remove_undirected_edge(neighbor, x);
+            dag_extension.remove_undirected_edge(neighbor, x);
+            dag_extension.add_directed_edge(neighbor, x);
+        }
+
+        while (!dag_tmp.get_parents(x).empty()) {
+            int parent = *dag_tmp.get_parents(x).begin();
+            dag_tmp.remove_directed_edge(parent, x);
+        }
+        nodes_tmp.erase(x);
+    }
+    return dag_extension;
+}
+
+std::string PDAG::get_adj_string() const {
+    std::string result = "";
+    // first line, each node
+    for (int node: nodes) { result += std::to_string(node) + ", "; }
+    // remove last ", "
+    if (!result.empty()) {
+        result.pop_back();
+        result.pop_back();
+    }
+    result += "\n";
+    std::string line;
+    // other line: adjacency matrix (0,1)
+    for (int node: nodes) {
+        line = "";
+        for (int node2: nodes) {
+            if (node == node2) {
+                line += "0, ";
+            } else if (has_undirected_edge(node, node2) || has_directed_edge(node, node2)) {
+                line += "1, ";
+            } else {
+                line += "0, ";
+            }
+        }
+        // remove last ", "
+        if (!line.empty()) {
+            line.pop_back();
+            line.pop_back();
+        }
+        result += line;
+        result += "\n";
+    }
+    return result;
+}
 
 // insert
 // i like the general maintain_cpdag function;

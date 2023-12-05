@@ -25,6 +25,7 @@ private:
     void initialize_fit(MatrixXd &data, ScorerInterface &scorer);
 
 public:
+    const double initial_score = 0;
     XGES(const MatrixXd &data, ScorerInterface *scorer);
 
     void fit_heuristic();

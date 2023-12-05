@@ -8,9 +8,11 @@
 
 using namespace std::chrono;
 
-XGES::XGES(const Eigen::MatrixXd &data, ScorerInterface *scorer) : pdag(data.cols()), scorer(scorer) {
+XGES::XGES(const Eigen::MatrixXd &data, ScorerInterface *scorer)
+    : pdag(data.cols()), scorer(scorer), initial_score(scorer->score_pdag(pdag)) {
     n_variables = data.cols();
     n_samples = data.rows();
+    total_score = initial_score;
 }
 
 
@@ -330,7 +332,7 @@ void XGES::find_deletes_to_y(int y, std::vector<Delete> &candidate_deletes) {
         // we know that O = {} is valid
         FlatSet effective_parents_init;
         effective_parents_init.reserve(parents_y.size() + neighbors_y_adjacent_x.size() + 1);
-        // note: Chickering Corrollary 18 is incorrect. Pa(y) might not contain x, it has to be added.
+        // note: Chickering Corollary 18 is incorrect. Pa(y) might not contain x, it has to be added.
         union_with_single_element(parents_y, x, effective_parents_init);
         stack.emplace(FlatSet{}, neighbors_y_adjacent_x.begin(), effective_parents_init);
 

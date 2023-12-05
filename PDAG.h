@@ -122,4 +122,8 @@ public:
     friend std::ostream &operator<<(std::ostream &os, const PDAG &obj);
 
     void add_edges_around(int x, int y, EdgeQueueSet &edgeQueueSet, bool is_directed = false);
+
+    PDAG get_dag_extension() const;
+
+    std::string get_adj_string() const;
 };
