@@ -12,7 +12,7 @@
 #include <vector>
 
 using Eigen::MatrixXd;
-
+using Eigen::VectorXi;
 
 // Specialize std::hash for std::set<int>
 namespace std {
@@ -32,7 +32,10 @@ class BICScorer : public ScorerInterface {
 private:
     int n_variables;
     int n_samples;
+    int n_interventions = 0;
+
     const MatrixXd &data;
+    const VectorXi interventions_index = VectorXi::Zero(0);
     double alpha;
     const MatrixXd covariance_matrix;
 
@@ -43,5 +46,6 @@ private:
 
 public:
     BICScorer(const MatrixXd &data, double alpha);
+    BICScorer(const MatrixXd &data, const VectorXi &interventions_index, double alpha);
     double local_score(int target, const FlatSet &parents) override;
 };

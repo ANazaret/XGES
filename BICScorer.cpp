@@ -20,6 +20,48 @@ MatrixXd compute_covariance(const MatrixXd &data) {
     return covariance_matrix / n_samples;
 }
 
+MatrixXd compute_covariance(const MatrixXd &data, const VectorXi &interventions_index) {
+    int n_variables = data.cols();
+    int n_interventions = interventions_index.maxCoeff() + 1;
+    int n_samples = data.rows();
+    Eigen::VectorXd means = data.colwise().mean();
+
+    MatrixXd covariance_matrix(n_variables + n_interventions, n_variables + n_interventions);
+    for (int i = 0; i < n_variables + n_interventions; ++i) {
+        for (int j = 0; j <= i; ++j) {
+            Eigen::VectorXd x;
+            Eigen::VectorXd y;
+            if (i < n_variables) {
+                x = data.col(i).array() - means(i);
+            } else {
+                int i_intervention = i - n_variables;
+                x = Eigen::VectorXd::Zero(n_samples);
+                // set x to 1 for samples where the intervention is active
+                for (int k = 0; k < n_samples; ++k) {
+                    if (interventions_index(k) == i_intervention) { x(k) = 1; }
+                }
+                x.array() -= x.mean();
+            }
+            if (j < n_variables) {
+                y = data.col(j).array() - means(j);
+            } else {
+                int j_intervention = j - n_variables;
+                y = Eigen::VectorXd::Zero(n_samples);
+                // set y to 1 for samples where the intervention is active
+                for (int k = 0; k < n_samples; ++k) {
+                    if (interventions_index(k) == j_intervention) { y(k) = 1; }
+                }
+                y.array() -= y.mean();
+            }
+            double covariance = x.matrix().transpose() * y.matrix();
+            covariance_matrix(i, j) = covariance;
+            covariance_matrix(j, i) = covariance;
+        }
+    }
+    // todo: benchmark, benchmark, benchmark, try vectorization
+    return covariance_matrix / n_samples;
+}
+
 BICScorer::BICScorer(const Eigen::MatrixXd &data, double alpha)
     : data(data), alpha(alpha), covariance_matrix(compute_covariance(data)) {
     n_variables = data.cols();
@@ -27,6 +69,14 @@ BICScorer::BICScorer(const Eigen::MatrixXd &data, double alpha)
     cache.resize(n_variables);
 }
 
+BICScorer::BICScorer(const Eigen::MatrixXd &data, const Eigen::VectorXi &interventions_index, double alpha)
+    : data(data), alpha(alpha), covariance_matrix(compute_covariance(data, interventions_index)),
+      interventions_index(interventions_index) {
+    n_variables = data.cols();
+    n_interventions = interventions_index.maxCoeff() + 1;
+    n_samples = data.rows();
+    cache.resize(n_variables);
+}
 
 double BICScorer::local_score(int target, const FlatSet &parents) {
     // cache lookup

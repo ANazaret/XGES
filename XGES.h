@@ -13,8 +13,12 @@ using Eigen::MatrixXd;
 class XGES {
 private:
     int n_variables;
+    int n_interventions;
     int n_samples;
     ScorerInterface *scorer;
+
+    std::vector<FlatSet> interventions_candidate_variables;
+    std::vector<FlatSet> variables_candidate_interventions;
 
     PDAG pdag;
     double total_score = 0;
@@ -27,6 +31,9 @@ private:
 public:
     const double initial_score = 0;
     XGES(const MatrixXd &data, ScorerInterface *scorer);
+
+    XGES(const Eigen::MatrixXd &data, std::vector<FlatSet> interventions_candidate_variables,
+         ScorerInterface *scorer);
 
     void fit_heuristic();
 
@@ -44,4 +51,6 @@ public:
     void find_reverse_from_x(int x, std::vector<Reverse> &candidate_reverses);
 
     std::map<std::string, double> statistics;
+
+    inline bool node_is_intervention(int node) const { return node >= n_variables; }
 };

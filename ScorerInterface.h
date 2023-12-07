@@ -38,7 +38,10 @@ public:
     double score_pdag(const PDAG &pdag) {
         double score = 0;
         PDAG dag = pdag.get_dag_extension();
-        for (int target: dag.get_nodes()) { score += local_score(target, dag.get_parents(target)); }
+        // compute the score at nodes that are variables, but use the parents from the PDAG
+        // including interventions.
+        // it computes the score of the DAG conditional on the interventions
+        for (int target: dag.get_nodes_variables()) { score += local_score(target, dag.get_parents(target)); }
         return score;
     }
 };

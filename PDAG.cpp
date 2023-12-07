@@ -6,9 +6,22 @@
 
 using namespace std::chrono;
 
-PDAG::PDAG(int num_nodes) : num_nodes(num_nodes), _block_semi_directed_path_queue(num_nodes) {
-    for (int i = 0; i < num_nodes; i++) {
-        nodes.push_back(i);
+PDAG::PDAG(int num_variables, int num_interventions)
+    : num_variables(num_variables), num_interventions(num_interventions),
+      _block_semi_directed_path_queue(num_variables) {
+    for (int i = 0; i < num_variables; i++) {
+        nodes_variables.push_back(i);
+        nodes_all.push_back(i);
+        children.emplace_back();
+        parents.emplace_back();
+        neighbors.emplace_back();
+        adjacent.emplace_back();
+        adjacent_reachable.emplace_back();
+        node_version.push_back(0);
+    }
+    for (int i = 0; i < num_interventions; i++) {
+        nodes_interventions.push_back(i + num_variables);
+        nodes_all.push_back(i + num_variables);
         children.emplace_back();
         parents.emplace_back();
         neighbors.emplace_back();
@@ -17,19 +30,19 @@ PDAG::PDAG(int num_nodes) : num_nodes(num_nodes), _block_semi_directed_path_queu
         node_version.push_back(0);
     }
 
-    _block_semi_directed_path_visited.resize(num_nodes);
-    _block_semi_directed_path_blocked.resize(num_nodes);
+    _block_semi_directed_path_visited.resize(num_variables);
+    _block_semi_directed_path_blocked.resize(num_variables);
 }
 
 int PDAG::get_number_of_edges() const { return number_of_directed_edges + number_of_undirected_edges; }
 
 int PDAG::get_node_version(int node) const { return node_version.at(node); }
 
-const std::vector<int> &PDAG::get_nodes() const { return nodes; }
+const std::vector<int> &PDAG::get_nodes_variables() const { return nodes_variables; }
 
 std::vector<std::pair<int, int>> PDAG::get_directed_edges() const {
     std::vector<std::pair<int, int>> edges;
-    for (const auto &node: nodes) {
+    for (const auto &node: nodes_variables) {
         for (int child: children.at(node)) { edges.emplace_back(node, child); }
     }
     return edges;
@@ -37,7 +50,8 @@ std::vector<std::pair<int, int>> PDAG::get_directed_edges() const {
 
 std::vector<std::pair<int, int>> PDAG::get_undirected_edges() const {
     std::vector<std::pair<int, int>> edges;
-    for (const auto &node: nodes) {
+    // interventions cannot have undirected edge
+    for (const auto &node: nodes_variables) {
         for (int neighbor: neighbors.at(node)) {
             if (node < neighbor) { edges.emplace_back(node, neighbor); }
         }
@@ -572,7 +586,8 @@ void PDAG::maintain_cpdag(EdgeQueueSet &edges_to_check, EdgeModificationsMap &ed
         if (edge.type == EdgeType::DIRECTED_TO_Y) {
             // Check if the edge is still directed
             if (is_part_of_v_structure(x, y) || is_oriented_by_meek_rule_1(x, y) ||
-                is_oriented_by_meek_rule_2(x, y) || is_oriented_by_meek_rule_3(x, y)) {
+                is_oriented_by_meek_rule_2(x, y) || is_oriented_by_meek_rule_3(x, y) ||
+                node_is_intervention(x)) {
                 // The edge is still directed
                 continue;
             }
@@ -585,11 +600,11 @@ void PDAG::maintain_cpdag(EdgeQueueSet &edges_to_check, EdgeModificationsMap &ed
             assert(edge.type != EdgeType::DIRECTED_TO_X && edge.type != EdgeType::NONE);
             // Check if the edge is now directed
             if (is_oriented_by_meek_rule_1(x, y) || is_oriented_by_meek_rule_2(x, y) ||
-                is_oriented_by_meek_rule_3(x, y)) {
+                is_oriented_by_meek_rule_3(x, y) || node_is_intervention(x)) {
 
                 // The edge is now directed
             } else if (is_oriented_by_meek_rule_1(y, x) || is_oriented_by_meek_rule_2(y, x) ||
-                       is_oriented_by_meek_rule_3(y, x)) {
+                       is_oriented_by_meek_rule_3(y, x) || node_is_intervention(y)) {
                 // The edge is now directed
                 std::swap(x, y);
             } else {
@@ -613,7 +628,8 @@ void PDAG::maintain_cpdag(EdgeQueueSet &edges_to_check, EdgeModificationsMap &ed
 PDAG PDAG::get_dag_extension() const {
     PDAG dag_extension = *this;
     PDAG dag_tmp = *this;
-    std::set<int> nodes_tmp(nodes.begin(), nodes.end());
+    // todo: check only using nodes_variables is ok
+    std::set<int> nodes_tmp(nodes_variables.begin(), nodes_variables.end());
 
     while (nodes_tmp.size() > 0) {
         // find a node x that:
@@ -668,7 +684,7 @@ PDAG PDAG::get_dag_extension() const {
 std::string PDAG::get_adj_string() const {
     std::string result = "";
     // first line, each node
-    for (int node: nodes) { result += std::to_string(node) + ", "; }
+    for (int node: nodes_variables) { result += std::to_string(node) + ", "; }
     // remove last ", "
     if (!result.empty()) {
         result.pop_back();
@@ -677,9 +693,9 @@ std::string PDAG::get_adj_string() const {
     result += "\n";
     std::string line;
     // other line: adjacency matrix (0,1)
-    for (int node: nodes) {
+    for (int node: nodes_variables) {
         line = "";
-        for (int node2: nodes) {
+        for (int node2: nodes_variables) {
             if (node == node2) {
                 line += "0, ";
             } else if (has_undirected_edge(node, node2) || has_directed_edge(node, node2)) {

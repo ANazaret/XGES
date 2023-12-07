@@ -15,6 +15,25 @@ XGES::XGES(const Eigen::MatrixXd &data, ScorerInterface *scorer)
     total_score = initial_score;
 }
 
+XGES::XGES(const Eigen::MatrixXd &data, std::vector<FlatSet> interventions_candidate_variables,
+           ScorerInterface *scorer)
+    : pdag(data.cols(), interventions_candidate_variables.size()), scorer(scorer),
+      initial_score(scorer->score_pdag(pdag)) {
+    n_variables = data.cols();
+    n_samples = data.rows();
+    total_score = initial_score;
+    this->interventions_candidate_variables = interventions_candidate_variables;
+    n_interventions = interventions_candidate_variables.size();
+    variables_candidate_interventions.resize(n_variables);
+    for (int i = 0; i < n_variables; ++i) {
+        for (int j = 0; j < n_interventions; ++j) {
+            if (interventions_candidate_variables[j].find(i) != interventions_candidate_variables[j].end()) {
+                variables_candidate_interventions[i].insert(j + n_variables);
+            }
+        }
+    }
+}
+
 
 void XGES::fit_heuristic() {
     // pre-selection
@@ -220,6 +239,7 @@ void XGES::heuristic_turn_delete_insert() {
  */
 void XGES::find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts, int parent_x,
                              bool low_parent_only, bool positive_only) {
+    if (node_is_intervention(y)) { return; }
     auto &adjacent_y = pdag.get_adjacent(y);
     auto &parents_y = pdag.get_parents(y);
 
@@ -229,7 +249,13 @@ void XGES::find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts, int 
         possible_parents.insert(parent_x);
     } else {
         // for now: no pre-selection
-        auto &nodes = pdag.get_nodes();
+        auto &nodes = pdag.get_nodes_variables();
+        if (n_interventions) {
+            // include candidate interventions
+            possible_parents.insert(variables_candidate_interventions[y].begin(),
+                                    variables_candidate_interventions[y].end());
+        }
+
         // 1. x is not adjacent to y (x ∉ Ad(y))
         std::set_difference(nodes.begin(), nodes.end(), adjacent_y.begin(), adjacent_y.end(),
                             std::inserter(possible_parents, possible_parents.begin()));

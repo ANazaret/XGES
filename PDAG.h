@@ -26,8 +26,11 @@ enum class PDAGModification {
 // Declare the PDAG class.
 class PDAG {
 private:
-    const int num_nodes;
-    std::vector<int> nodes;
+    const int num_variables;
+    const int num_interventions;
+    std::vector<int> nodes_variables;
+    std::vector<int> nodes_interventions;
+    std::vector<int> nodes_all;
     std::vector<FlatSet> children;
     std::vector<FlatSet> parents;
     std::vector<FlatSet> neighbors;
@@ -48,7 +51,7 @@ private:
 public:
     std::map<std::string, double> statistics;
 
-    explicit PDAG(int num_nodes);
+    explicit PDAG(int num_nodes, int num_interventions = 0);
 
     /**
      * Returns the number of edges in the PDAG.
@@ -60,8 +63,9 @@ public:
     int get_node_version(int node) const;
 
     std::vector<std::pair<int, int>> get_directed_edges() const;
-
+    std::vector<std::pair<int, int>> get_directed_edges_interventions() const;
     std::vector<std::pair<int, int>> get_undirected_edges() const;
+
 
     const FlatSet &get_parents(int node) const;
 
@@ -115,7 +119,7 @@ public:
     bool is_part_of_v_structure(int x, int y) const;
 
 
-    const std::vector<int> &get_nodes() const;
+    const std::vector<int> &get_nodes_variables() const;
 
     FlatSet get_neighbors_not_adjacent(int node_y, int node_x) const;
 
@@ -126,4 +130,6 @@ public:
     PDAG get_dag_extension() const;
 
     std::string get_adj_string() const;
+
+    inline bool node_is_intervention(int node) const { return node >= num_variables; }
 };
