@@ -333,3 +333,9 @@ def compute_ecshd_from_graph(graph1, graph2):
     cpdag2 = PDAG.from_digraph(graph2).to_cpdag()
 
     return PDAG.EC_SHD(cpdag1, cpdag2)
+
+
+def compute_shd_pdag_dag(pdag, dag):
+    if isinstance(pdag, nx.DiGraph):
+        pdag = PDAG.from_digraph(pdag).to_cpdag()
+    return pdag.shd_against_dag(dag)

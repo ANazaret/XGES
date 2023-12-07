@@ -11,6 +11,9 @@ import pandas as pd
 import sempler
 from cdt.causality.graph import GES
 
+from bic_score import BICScorer
+from pdag import compute_ecshd_from_graph, PDAG
+
 
 def simulation1(d, n_control=1000, n_inter=100, edges_per_d=10, seed=0, normalize=True, intervention=False):
     rng = np.random.RandomState(seed)
@@ -39,6 +42,7 @@ def simulation1(d, n_control=1000, n_inter=100, edges_per_d=10, seed=0, normaliz
         random_state=seed,
     )
 
+    data = data.astype(np.float64)
     if intervention:
         data = [data]
         intervention_labels = [-1] * n_control
@@ -46,10 +50,9 @@ def simulation1(d, n_control=1000, n_inter=100, edges_per_d=10, seed=0, normaliz
             intervention_labels += [i] * n_inter
             data.append(scm.sample(n=n_inter, random_state=i, shift_interventions={i: (-0.1, 0)}))
         data = np.concatenate(data, axis=0)
-        intervention_labels = np.array(intervention_labels)
-
-    # normalize the data? only on the control data?
-
+        intervention_labels = np.array(intervention_labels, dtype=np.int32)
+        data = data.astype(np.float64)
+        return data, true_dag, intervention_labels
     return data, true_dag
 
 
@@ -66,21 +69,35 @@ def run_ges(data, alpha, **kwargs):
     return output.graph
 
 
-def run_xges(data, alpha, **kwargs):
+def run_xges(data, alpha, intervention_labels=None):
     # 1) save the data to a tmp location, generate a unique tmp file name (e.g. using uuid)
 
     tmp_path = os.path.join(gettempdir(), "xges_" + str(uuid.uuid4()))
     os.makedirs(tmp_path, exist_ok=True)
     in_file = os.path.join(tmp_path, "data.npy")
+    intervention_labels_file = os.path.join(tmp_path, "intervention_labels.npy")
     out_file = os.path.join(tmp_path, "result.csv")
     stats_file = os.path.join(tmp_path, "stats.csv")
+    data = data.astype(np.float64)
     np.save(in_file, data)
+    if intervention_labels is not None:
+        intervention_labels = intervention_labels.astype(np.int32)
+        np.save(intervention_labels_file, intervention_labels)
 
     # 2) run xges by calling the c++ binary: xges -f <tmp location> -a <alpha>
     xges_path = "../cmake-build-release/ges_cpp"
     cmd = [xges_path, "-i", in_file, "-a", str(alpha), "-o", out_file, "--stats", stats_file]
+    if intervention_labels is not None:
+        cmd += ["--interventions", intervention_labels_file]
     start_time = time.time()
-    subprocess.run(cmd)
+    error_code = subprocess.run(cmd)
+    if error_code.returncode != 0:
+        print("error running xges")
+        # show the error message, the cmd used and the tmp location
+        print(error_code)
+        print(" ".join(cmd))
+        print(tmp_path)
+        raise RuntimeError("error running xges")
     xges_time = time.time() - start_time
 
     # 3) load the result from the tmp location, pd.read_csv(out_file)
@@ -93,9 +110,6 @@ def run_xges(data, alpha, **kwargs):
     shutil.rmtree(tmp_path)
 
     return graph, xges_stats
-
-
-from pdag import compute_ecshd_from_graph, PDAG
 
 
 def compare_methods_given_data(data, true_graph, alpha=1):
@@ -171,7 +185,7 @@ def benchmark_xges_alpha():
             data, true_graph = simulation1(
                 d,
                 n_control=10000,
-                n_inter=None,
+                n_inter=0,
                 edges_per_d=int(d**0.5),
                 seed=seed,
                 normalize=True,
@@ -186,6 +200,105 @@ def benchmark_xges_alpha():
     scores.to_csv("scores-xges-alphas.csv", index=False)
 
 
+def experiment_more_observational():
+    scores = []
+    n_inter = 100
+    n_obs_vals = [100, 1000, 10000, 100000]
+    for d in [30]:
+        for seed in range(10):
+            xges_graphs = dict()
+            df = []
+
+            for n_obs in n_obs_vals:
+                data, true_graph, intervention_labels = simulation1(
+                    d,
+                    n_control=n_obs,
+                    n_inter=n_inter,
+                    edges_per_d=4,
+                    seed=seed,
+                    normalize=True,
+                    intervention=True,
+                )
+                alpha = int(np.sqrt(data.shape[0]))
+
+                xges_graph, xges_stats = run_xges(data, alpha, intervention_labels)
+                xges_graphs[n_obs] = xges_graph
+            xges_graphs["true"] = true_graph
+
+            for graph_idx in xges_graphs:
+                # compute the score of each graph under each n_obs
+                df_record = dict()
+                df_record["graph"] = graph_idx
+
+                for n_obs in n_obs_vals:
+                    data, true_graph, intervention_labels = simulation1(
+                        d,
+                        n_control=n_obs,
+                        n_inter=n_inter,
+                        edges_per_d=4,
+                        seed=seed,
+                        normalize=True,
+                        intervention=True,
+                    )
+                    bs = BICScorer(data.shape[0], data.shape[1], alpha=alpha, data=data, ignored_variables=[])
+                    df_record[f"score_n_obs{n_obs}"] = bs.score_of_dag(xges_graphs[graph_idx])
+
+                df_record["shd"] = PDAG.from_digraph(xges_graphs[graph_idx]).shd_against_dag(true_graph)
+                df_record["ec-shd"] = compute_ecshd_from_graph(xges_graphs[graph_idx], true_graph)
+                df_record["n_edges"] = len(xges_graphs[graph_idx].edges)
+                df_record["alpha"] = alpha
+                df_record["d"] = d
+                df_record["seed"] = seed
+
+                df.append(df_record)
+            df = pd.DataFrame(df)
+            scores.append(df)
+
+    scores = pd.concat(scores)
+    scores.to_csv("scores-xges-range-obs.csv", index=False)
+
+
+
+
+def test_score_match():
+    data, true_graph = simulation1(10, n_control=10000, n_inter=0, edges_per_d=2, seed=0, normalize=True)
+    alpha = 2.0
+    xges_graph, xges_stats = run_xges(data, alpha)
+
+    bs = BICScorer(data.shape[0], data.shape[1], alpha=alpha, data=data, ignored_variables=[])
+    cpp_score = xges_stats["score"]
+    python_score = bs.score_of_dag(xges_graph)
+
+    print(
+        "python score",
+        python_score,
+        "cpp empty score",
+        cpp_score,
+        "shd",
+        PDAG.from_digraph(xges_graph).shd_against_dag(true_graph),
+    )
+    print(true_graph.edges)
+
+    # data, true_graph, interventions_index = simulation1(
+    #     20, n_control=10000, n_inter=100, edges_per_d=2, seed=0, normalize=True, intervention=True
+    # )
+    # alpha = 2
+    # xges_graph, xges_stats = run_xges(data, alpha, interventions_index)
+    #
+    # bs = BICScorer(data.shape[0], data.shape[1], alpha=alpha, data=data, ignored_variables=[])
+    # our_score = bs.score_of_dag(xges_graph)
+    # true_graph_our_score = bs.score_of_dag(true_graph)
+    # print(
+    #     "our score",
+    #     our_score,
+    #     "xges score",
+    #     xges_stats["score"],
+    #     "true graph score",
+    #     true_graph_our_score,
+    # )
+
+
 if __name__ == "__main__":
-    benchmark_xges_alpha()
-    # TODO: just call run_xges
+    # experiment_more_observational()
+    test_score_match()
+    # benchmark_xges_alpha()
