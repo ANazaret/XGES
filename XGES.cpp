@@ -72,12 +72,13 @@ void XGES::heuristic_turn_delete_insert() {
     Insert last_insert(-1, -1, FlatSet{}, -1, FlatSet{});
 
     // now do the heuristic
-    while (!candidate_inserts.empty() || !candidate_reverses.empty() || !candidate_deletes.empty()) {
+    while (!candidate_inserts.empty() || !candidate_reverses.empty() ||
+           (!candidate_deletes.empty() && candidate_deletes.front().score > -deletion_threshold)) {
         // In order: reverse, delete, insert
         // Apply only one operator per iteration
         edge_modifications.clear();
 
-        if (!candidate_deletes.empty()) {
+        if (!candidate_deletes.empty() && candidate_deletes.front().score > -deletion_threshold) {
             // pop the best delete
             std::pop_heap(candidate_deletes.begin(), candidate_deletes.end());
             auto best_delete = std::move(candidate_deletes.back());
@@ -138,6 +139,9 @@ void XGES::heuristic_turn_delete_insert() {
                 total_score += last_insert.score;
                 // log it
                 std::cout << i_operations << ". " << last_insert << std::endl;
+                if (deletion_threshold < 0) deletion_threshold = last_insert.score - 1e-10;
+                else
+                    deletion_threshold = std::min(last_insert.score - 1e-10, deletion_threshold);
             } else {
                 statistics["time- is_insert_valid false"] +=
                         duration_cast<duration<double>>(high_resolution_clock::now() - start_time).count();
@@ -371,7 +375,7 @@ void XGES::find_deletes_to_y(int y, std::vector<Delete> &candidate_deletes) {
 
             // change if we parallelize
             double score = scorer->score_delete(y, effective_parents, x);
-            if (score > 0) {
+            if (score > -deletion_threshold) {
                 candidate_deletes.emplace_back(x, y, O, score, effective_parents);
                 std::push_heap(candidate_deletes.begin(), candidate_deletes.end());
             }

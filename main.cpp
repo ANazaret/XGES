@@ -10,7 +10,6 @@ namespace fs = std::filesystem;
 
 
 #include "cnpy.h"
-#include "test.h"
 typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> RowMajorMatrixXd;
 
 int main(int argc, char *argv[]) {
@@ -29,6 +28,8 @@ int main(int argc, char *argv[]) {
     option_adder("interventions",
                  "If provided, numpy file with intervention applied to each sample (-1 if none)",
                  cxxopts::value<std::string>()->default_value(""));
+
+    option_adder("t", "threshold delete", cxxopts::value<bool>());
 
 
     auto result = options.parse(argc, argv);
@@ -59,7 +60,12 @@ int main(int argc, char *argv[]) {
 
     XGES xges = (result.count("interventions") > 0) ? XGES(m, interventions_candidate_variables, &scorer)
                                                     : XGES(m, &scorer);
-
+    // todo: handle it not in this hacky way
+    if (result.count("t")) {
+        xges.deletion_threshold = -1;
+    } else {
+        xges.deletion_threshold = 1e-10;
+    }
     clock_t start = clock();
     xges.fit_heuristic();
     clock_t end = clock();

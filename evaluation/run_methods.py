@@ -69,7 +69,7 @@ def run_ges(data, alpha, **kwargs):
     return output.graph
 
 
-def run_xges(data, alpha, intervention_labels=None):
+def run_xges(data, alpha, intervention_labels=None, threshold=False):
     # 1) save the data to a tmp location, generate a unique tmp file name (e.g. using uuid)
 
     tmp_path = os.path.join(gettempdir(), "xges_" + str(uuid.uuid4()))
@@ -89,6 +89,8 @@ def run_xges(data, alpha, intervention_labels=None):
     cmd = [xges_path, "-i", in_file, "-a", str(alpha), "-o", out_file, "--stats", stats_file]
     if intervention_labels is not None:
         cmd += ["--interventions", intervention_labels_file]
+    if threshold:
+        cmd += ["-t"]
     start_time = time.time()
     error_code = subprocess.run(cmd)
     if error_code.returncode != 0:
@@ -258,12 +260,10 @@ def experiment_more_observational():
     scores.to_csv("scores-xges-range-obs.csv", index=False)
 
 
-
-
 def test_score_match():
-    data, true_graph = simulation1(10, n_control=10000, n_inter=0, edges_per_d=2, seed=0, normalize=True)
-    alpha = 2.0
-    xges_graph, xges_stats = run_xges(data, alpha)
+    data, true_graph = simulation1(20, n_control=10000, n_inter=0, edges_per_d=3, seed=0, normalize=True)
+    alpha = 1.0
+    xges_graph, xges_stats = run_xges(data, alpha, threshold=False)
 
     bs = BICScorer(data.shape[0], data.shape[1], alpha=alpha, data=data, ignored_variables=[])
     cpp_score = xges_stats["score"]
@@ -278,7 +278,12 @@ def test_score_match():
         PDAG.from_digraph(xges_graph).shd_against_dag(true_graph),
     )
     print(true_graph.edges)
+    print(list(nx.topological_sort(true_graph)))
+    # plot graph in topological order
 
+    # nx.draw_networkx(true_graph, with_labels=True)
+
+    # plt.show()
     # data, true_graph, interventions_index = simulation1(
     #     20, n_control=10000, n_inter=100, edges_per_d=2, seed=0, normalize=True, intervention=True
     # )
@@ -298,7 +303,69 @@ def test_score_match():
     # )
 
 
+def test_threshold():
+    res = []
+    for d in [20, 30, 40, 50, 100]:
+        for edges_per_d in [1, 2, 3, 4]:
+            for seed in range(5):
+                for n_obs in [1000, 10000, 100000]:
+                    data, true_graph, ii = simulation1(
+                        d,
+                        n_control=n_obs,
+                        n_inter=100,
+                        edges_per_d=edges_per_d,
+                        seed=seed,
+                        normalize=True,
+                        intervention=True,
+                    )
+                    alpha = 1.0
+
+                    best_score = -np.inf
+                    associated_shd = None
+                    for t in [True, False]:
+                        xges_graph, xges_stats = run_xges(data, alpha, ii, threshold=t)
+                        cpp_score = xges_stats["score"]
+                        shd = PDAG.from_digraph(xges_graph).shd_against_dag(true_graph)
+                        res.append(
+                            {
+                                "d": d,
+                                "edges_per_d": edges_per_d,
+                                "seed": seed,
+                                "n_obs": n_obs,
+                                "cpp_score": cpp_score,
+                                "shd": shd,
+                                "threshold": t,
+                            }
+                        )
+                        if cpp_score > best_score:
+                            best_score = cpp_score
+                            associated_shd = shd
+                    res.append(
+                        {
+                            "d": d,
+                            "edges_per_d": edges_per_d,
+                            "seed": seed,
+                            "n_obs": n_obs,
+                            "cpp_score": best_score,
+                            "shd": associated_shd,
+                            "threshold": "best",
+                        }
+                    )
+    res = pd.DataFrame(res)
+    print(res.groupby(["d", "n_obs", "threshold"])[["cpp_score", "shd"]].mean().to_string())
+    print(res.groupby(["d", "threshold"])[["cpp_score", "shd"]].mean().to_string())
+    print(res.groupby(["n_obs", "threshold"])[["cpp_score", "shd"]].mean().to_string())
+    print(res.groupby(["edges_per_d", "threshold"])[["cpp_score", "shd"]].mean().to_string())
+    print(res.groupby(["threshold"])[["cpp_score", "shd"]].mean().to_string())
+
+    # res.to_csv("scores-xges-threshold.csv", index=False)
+    res.to_csv("scores-xges-threshold-interventions.csv", index=False)
+
+    # plot graph in topological order
+
+
 if __name__ == "__main__":
     # experiment_more_observational()
-    test_score_match()
+    # test_score_match()
     # benchmark_xges_alpha()
+    test_threshold()

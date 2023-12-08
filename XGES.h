@@ -13,7 +13,7 @@ using Eigen::MatrixXd;
 class XGES {
 private:
     int n_variables;
-    int n_interventions;
+    int n_interventions = 0;
     int n_samples;
     ScorerInterface *scorer;
 
@@ -53,4 +53,5 @@ public:
     std::map<std::string, double> statistics;
 
     inline bool node_is_intervention(int node) const { return node >= n_variables; }
+    double deletion_threshold = -1;// todo: if we enable starting from a pdag, we need to set this differently
 };
