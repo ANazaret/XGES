@@ -24,6 +24,9 @@ std::ostream &operator<<(std::ostream &os, const Delete &obj) {
     os << "Delete: " << obj.x << "-?-" << obj.y << ", O = {";
     for (auto t: obj.O) { os << t << ", "; }
     os << "}, score = " << obj.score;
+    os << ", effective_parents = {";
+    for (auto p: obj.effective_parents) { os << p << ", "; }
+    os << "}";
     return os;
 }
 
