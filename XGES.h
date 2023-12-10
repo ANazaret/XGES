@@ -28,6 +28,8 @@ private:
     void heuristic_turn_delete_insert(std::vector<Insert> &candidate_inserts,
                                       std::vector<Reverse> &candidate_reverses,
                                       std::vector<Delete> &candidate_deletes);
+    bool block_each_edge_and_research(int optimization);
+
     void initialize_fit(MatrixXd &data, ScorerInterface &scorer);
 
 public:
@@ -39,7 +41,10 @@ public:
 
     void fit_heuristic();
 
+    void fit_heuristic(int optimization = 0);
+
     double get_score() const;
+    PDAG *ground_truth_pdag = nullptr;
 
     const PDAG &get_pdag() const;
 

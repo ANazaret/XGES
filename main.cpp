@@ -19,8 +19,8 @@ int main(int argc, char *argv[]) {
 
     cxxopts::Options options("xges", "Run XGES algorithm on a dataset");
     auto option_adder = options.add_options();
-    option_adder("input,i", "Input data numpy file", cxxopts::value<std::string>());
-    option_adder("output,o", "Output file (default `xges-graph.txt`)",
+    option_adder("input", "Input data numpy file", cxxopts::value<std::string>());
+    option_adder("output", "Output file (default `xges-graph.txt`)",
                  cxxopts::value<std::string>()->default_value("xges-graph.txt"));
     option_adder("alpha,a", "Alpha parameter", cxxopts::value<double>()->default_value("0.5"));
     option_adder("stats", "File to save statistics (default `xges-stats.txt`)",
@@ -30,13 +30,16 @@ int main(int argc, char *argv[]) {
                  cxxopts::value<std::string>()->default_value(""));
 
     option_adder("t", "threshold delete", cxxopts::value<bool>());
+    option_adder("o", "optimization", cxxopts::value<int>()->default_value("0"));
+
+    option_adder("graph_truth,g", "Graph truth file", cxxopts::value<std::string>());
 
 
-    auto result = options.parse(argc, argv);
+    auto args = options.parse(argc, argv);
 
-    fs::path data_path = result["input"].as<std::string>();
-    fs::path output_path = result["output"].as<std::string>();
-    double alpha = result["alpha"].as<double>();
+    fs::path data_path = args["input"].as<std::string>();
+    fs::path output_path = args["output"].as<std::string>();
+    double alpha = args["alpha"].as<double>();
 
     cnpy::NpyArray arr = cnpy::npy_load(data_path);
     RowMajorMatrixXd m = Eigen::Map<RowMajorMatrixXd>(arr.data<double>(), arr.shape[0], arr.shape[1]);
@@ -46,8 +49,8 @@ int main(int argc, char *argv[]) {
 
     Eigen::VectorXi m_interventions;
     std::vector<FlatSet> interventions_candidate_variables;
-    if (result.count("interventions")) {
-        fs::path interventions_path = result["interventions"].as<std::string>();
+    if (args.count("interventions")) {
+        fs::path interventions_path = args["interventions"].as<std::string>();
         cnpy::NpyArray arr_interventions = cnpy::npy_load(interventions_path);
         m_interventions =
                 Eigen::Map<Eigen::VectorXi>(arr_interventions.data<int32_t>(), arr_interventions.shape[0]);
@@ -56,18 +59,27 @@ int main(int argc, char *argv[]) {
     }
     // fix this by using only one constructor with good defaults
     BICScorer scorer =
-            (result.count("interventions") > 0) ? BICScorer(m, m_interventions, alpha) : BICScorer(m, alpha);
+            (args.count("interventions") > 0) ? BICScorer(m, m_interventions, alpha) : BICScorer(m, alpha);
 
-    XGES xges = (result.count("interventions") > 0) ? XGES(m, interventions_candidate_variables, &scorer)
-                                                    : XGES(m, &scorer);
+    XGES xges = (args.count("interventions") > 0) ? XGES(m, interventions_candidate_variables, &scorer)
+                                                  : XGES(m, &scorer);
+
+    PDAG graph_truth = (args.count("graph_truth") > 0)
+                               ? PDAG::from_file(args["graph_truth"].as<std::string>())
+                               : PDAG(m.cols());
+    if (args.count("graph_truth") > 0) {
+        std::cout << "Score truth: " << scorer.score_pdag(graph_truth) << std::endl;
+        xges.ground_truth_pdag = &graph_truth;
+        std::cout << graph_truth << std::endl;
+    }
     // todo: handle it not in this hacky way
-    if (result.count("t")) {
+    if (args.count("t")) {
         xges.deletion_threshold = -1;
     } else {
         xges.deletion_threshold = 1e-10;
     }
     clock_t start = clock();
-    xges.fit_heuristic();
+    xges.fit_heuristic(args["o"].as<int>());
     clock_t end = clock();
     double elapsed_secs = double(end - start) / CLOCKS_PER_SEC;
     std::cout << "Time elapsed: " << elapsed_secs << std::endl;
@@ -89,7 +101,7 @@ int main(int argc, char *argv[]) {
     out_file << xges.get_pdag().get_adj_string();
     out_file.close();
 
-    std::ofstream stats_file(result["stats"].as<std::string>());
+    std::ofstream stats_file(args["stats"].as<std::string>());
     stats_file << std::setprecision(16);
     stats_file << "time, " << elapsed_secs << std::endl;
     stats_file << "score, " << xges.get_score() << std::endl;

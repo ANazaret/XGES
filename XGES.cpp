@@ -46,6 +46,11 @@ void XGES::fit_heuristic(int optimization) {
     std::vector<Delete> candidate_deletes;
     candidate_deletes.reserve(n_variables);
     heuristic_turn_delete_insert(candidate_inserts, candidate_reverses, candidate_deletes);
+    if (ground_truth_pdag != nullptr) {
+        std::cout << "SHD=" << pdag.shd(*ground_truth_pdag) << std::endl;
+        std::cout << "SHD-U=" << pdag.shd(*ground_truth_pdag, false) << std::endl;
+        std::cout << "score-truth=" << scorer->score_pdag(*ground_truth_pdag) << std::endl;
+    }
 void XGES::heuristic_turn_delete_insert(std::vector<Insert> &candidate_inserts,
                                         std::vector<Reverse> &candidate_reverses,
                                         std::vector<Delete> &candidate_deletes) {
