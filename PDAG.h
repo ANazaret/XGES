@@ -26,8 +26,8 @@ enum class PDAGModification {
 // Declare the PDAG class.
 class PDAG {
 private:
-    const int num_variables;
-    const int num_interventions;
+    int num_variables;
+    int num_interventions;
     std::vector<int> nodes_variables;
     std::vector<int> nodes_interventions;
     std::vector<int> nodes_all;
@@ -47,6 +47,9 @@ private:
     std::vector<char> _block_semi_directed_path_visited;
     std::vector<char> _block_semi_directed_path_blocked;
     CircularBuffer<int> _block_semi_directed_path_queue;
+
+    std::vector<FlatSet> forbidden_insert_parents;
+    std::vector<FlatSet> forbidden_insert_children;
 
 public:
     std::map<std::string, double> statistics;
@@ -137,6 +140,16 @@ public:
     std::string get_adj_string() const;
 
     inline bool node_is_intervention(int node) const { return node >= num_variables; }
+
+    inline bool insert_is_forbidden(int x, int y) const {
+        return forbidden_insert_parents[y].find(x) != forbidden_insert_parents[y].end();
+    }
+
+    inline void add_forbidden_insert(int parent, int y) {
+        forbidden_insert_parents[y].insert(parent);
+        forbidden_insert_children[parent].insert(y);
+    }
+
 
     int shd(const PDAG &other, bool allow_directed_in_other = true) const;
 };

@@ -25,7 +25,9 @@ private:
 
     //    void pre_selection
 
-    void heuristic_turn_delete_insert();
+    void heuristic_turn_delete_insert(std::vector<Insert> &candidate_inserts,
+                                      std::vector<Reverse> &candidate_reverses,
+                                      std::vector<Delete> &candidate_deletes);
     void initialize_fit(MatrixXd &data, ScorerInterface &scorer);
 
 public:
@@ -44,7 +46,7 @@ public:
     void find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts, int parent_x = -1,
                            bool low_parent_only = false, bool positive_only = true);
 
-    void find_deletes_to_y(int y, std::vector<Delete> &candidate_deletes);
+    void find_deletes_to_y(int y, std::vector<Delete> &candidate_deletes, double threshold = 0);
 
     void find_reverse_to_y(int y, std::vector<Reverse> &candidate_reverses);
 
@@ -54,4 +56,10 @@ public:
 
     inline bool node_is_intervention(int node) const { return node >= n_variables; }
     double deletion_threshold = -1;// todo: if we enable starting from a pdag, we need to set this differently
+
+
+    void update_operator_candidates(EdgeModificationsMap &edge_modifications,
+                                    std::vector<Insert> &candidate_inserts,
+                                    std::vector<Reverse> &candidate_reverses,
+                                    std::vector<Delete> &candidate_deletes);
 };
