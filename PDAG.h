@@ -53,6 +53,9 @@ public:
 
     explicit PDAG(int num_nodes, int num_interventions = 0);
 
+    // read from file
+    static PDAG from_file(const std::string &filename);
+
     /**
      * Returns the number of edges in the PDAG.
      * @return The number of edges in the PDAG.
@@ -116,6 +119,8 @@ public:
 
     bool is_oriented_by_meek_rule_3(int x, int y) const;
 
+    bool is_oriented_by_meek_rule_4(int x, int y) const;
+
     bool is_part_of_v_structure(int x, int y) const;
 
 
@@ -132,4 +137,6 @@ public:
     std::string get_adj_string() const;
 
     inline bool node_is_intervention(int node) const { return node >= num_variables; }
+
+    int shd(const PDAG &other, bool allow_directed_in_other = true) const;
 };

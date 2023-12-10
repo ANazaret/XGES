@@ -3,6 +3,8 @@
 //
 #include "PDAG.h"
 #include "set_ops.h"
+#include <fstream>
+#include <sstream>
 
 using namespace std::chrono;
 
@@ -534,6 +536,36 @@ bool PDAG::is_oriented_by_meek_rule_3(int x, int y) const {
     return false;
 }
 
+
+/**
+ * NOT TESTED
+ * Meek rule 4: (w - x - y) ∧ (w → z → y) ∧ (w - y)  ⇒  (x → y)
+ *
+ * Assume that we have (x - y)
+ * Condition: Exists (z, w) such that
+ *  1. w - x and w - y
+ *  2. w → z and z → y
+ *  3. z, x not adjacent
+ */
+bool PDAG::is_oriented_by_meek_rule_4(int x, int y) const {
+    // 1. w - x and w - y
+    const auto &neighbors_x = neighbors.at(x);
+    const auto &neighbors_y = neighbors.at(y);
+    FlatSet candidates_w;
+    std::set_intersection(neighbors_x.begin(), neighbors_x.end(), neighbors_y.begin(), neighbors_y.end(),
+                          std::inserter(candidates_w, candidates_w.begin()));
+    for (auto candidate_w: candidates_w) {
+        // 2. w → z and z → y
+        for (auto candidate_z: children.at(candidate_w)) {
+            if (children.at(candidate_z).find(y) != children.at(candidate_z).end()) {
+                // 3. z, x not adjacent
+                if (adjacent.at(candidate_z).find(x) == adjacent.at(candidate_z).end()) { return true; }
+            }
+        }
+    }
+    return false;
+}
+
 /**
  * Check if (x, y) is part of a v-structure.
  *
@@ -715,9 +747,64 @@ std::string PDAG::get_adj_string() const {
     return result;
 }
 
-// insert
-// i like the general maintain_cpdag function;
-// i should keep track of v-structured edges: not for now
+PDAG PDAG::from_file(const std::string &filename) {
+    std::ifstream file(filename);
+    std::string line;
+    std::vector<int> nodes;
+
+    // Read first line to get nodes
+    if (std::getline(file, line)) {
+        std::stringstream ss(line);
+        int node;
+        while (ss >> node) {
+            nodes.push_back(node);
+            if (ss.peek() == ',') ss.ignore();
+        }
+    }
+
+    PDAG graph(nodes.size(), 0);
+
+    // Read adjacency matrix lines
+    int i = 0;
+    while (std::getline(file, line)) {
+        std::istringstream ss(line);
+        std::string token;
+        int j = 0;
+        while (std::getline(ss, token, ',')) {
+            int value = std::stoi(token);
+            if (value == 1 && i != j) {
+                graph.add_directed_edge(nodes[i], nodes[j]);
+                std::cout << "add_directed_edge(" << nodes[i] << ", " << nodes[j] << ")" << std::endl;
+            }
+            j++;
+        }
+        i++;
+        std::cout << "i = " << i << std::endl;
+    }
+    file.close();
+    return graph;
+}
+
+int PDAG::shd(const PDAG &other, bool allow_directed_in_other) const {
+    int shd = 0;
+    for (int node: nodes_variables) {
+        for (int node2: nodes_variables) {
+            if (node >= node2) { continue; }
+            if ((has_directed_edge(node, node2) && !other.has_directed_edge(node, node2)) ||
+                (has_directed_edge(node2, node) && !other.has_directed_edge(node2, node)) ||
+                (has_undirected_edge(node, node2) && !other.has_undirected_edge(node, node2)) ||
+                (adjacent.at(node).find(node2) == adjacent.at(node).end() &&
+                 other.adjacent.at(node).find(node2) != other.adjacent.at(node).end())) {
+                shd++;
+            }
+            if (allow_directed_in_other && has_undirected_edge(node, node2) &&
+                (other.has_directed_edge(node, node2) || other.has_directed_edge(node2, node))) {
+                shd--;
+            }
+        }
+    }
+    return shd;
+}
 
 std::ostream &operator<<(std::ostream &os, const PDAG &obj) {
     os << "PDAG: directed edges = {";
