@@ -10,12 +10,27 @@ template<class T>
 class CircularBuffer {
 private:
     std::unique_ptr<T[]> buffer;
-    int front_idx = 0;
-    int back_idx = 0;
+    int front_idx = 0;// index of the first element
+    int back_idx = 0; // index of the last element
     int max_size;
 
 public:
     CircularBuffer<T>(int max_size) : buffer(std::unique_ptr<T[]>(new T[max_size])), max_size(max_size){};
+
+    // copy assignment
+    CircularBuffer<T> &operator=(const CircularBuffer<T> &other) {
+        buffer = std::unique_ptr<T[]>(new T[other.max_size]);
+        max_size = other.max_size;
+        front_idx = other.front_idx;
+        back_idx = other.back_idx;
+        if (front_idx < back_idx)
+            std::copy(other.buffer.get() + front_idx, other.buffer.get() + back_idx, buffer.get());
+        else if (front_idx > back_idx) {
+            std::copy(other.buffer.get() + front_idx, other.buffer.get() + max_size, buffer.get());
+            std::copy(other.buffer.get(), other.buffer.get() + back_idx, buffer.get() + max_size - front_idx);
+        }
+        return *this;
+    }
 
     void push_back(T item) {
         buffer[back_idx] = item;
@@ -40,9 +55,9 @@ public:
     bool empty() { return front_idx == back_idx; }
 
     int size() {
-        if (front_idx >= back_idx) return front_idx - back_idx;
+        if (front_idx <= back_idx) return back_idx - front_idx;
         else
-            return max_size - back_idx + front_idx;
+            return max_size + back_idx - front_idx;
     }
 
     void clear() {
