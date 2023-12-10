@@ -37,6 +37,7 @@ bool equal_union(const T &a, const T &b1, const T &b2) {
 
     while (ita != a.end()) {
         if (itb1 != b1.end() && *itb1 == *ita) {
+            if (itb2 != b2.end() && *itb2 == *ita) { ++itb2; }
             ++itb1;
             ++ita;
         } else if (itb2 != b2.end() && *itb2 == *ita) {
@@ -47,6 +48,35 @@ bool equal_union(const T &a, const T &b1, const T &b2) {
         }
     }
     if (itb1 != b1.end() || itb2 != b2.end()) { return false; }
+    return true;
+}
+
+template<typename T, typename U>
+bool equal_union_with_singleton(const T &a, const T &b1, const T &b2, const U b3_singleton) {
+    // Iterate over a and check that each element is in b1 or b2
+    auto itb1 = b1.begin();
+    auto itb2 = b2.begin();
+    auto ita = a.begin();
+    bool singleton_found = false;
+
+    while (ita != a.end()) {
+        if (itb1 != b1.end() && *itb1 == *ita) {
+            if (itb2 != b2.end() && *itb2 == *ita) { ++itb2; }
+            if (*ita == b3_singleton) { singleton_found = true; }
+            ++itb1;
+            ++ita;
+        } else if (itb2 != b2.end() && *itb2 == *ita) {
+            if (*ita == b3_singleton) { singleton_found = true; }
+            ++itb2;
+            ++ita;
+        } else if (*ita == b3_singleton) {
+            singleton_found = true;
+            ++ita;
+        } else {
+            return false;
+        }
+    }
+    if (itb1 != b1.end() || itb2 != b2.end() || !singleton_found) { return false; }
     return true;
 }
 
