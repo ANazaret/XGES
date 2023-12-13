@@ -7,16 +7,9 @@
 MatrixXd compute_covariance(const MatrixXd &data) {
     int n_variables = data.cols();
     int n_samples = data.rows();
-    MatrixXd covariance_matrix(n_variables, n_variables);
-    for (int i = 0; i < n_variables; ++i) {
-        for (int j = 0; j < n_variables; ++j) {
-            double covariance = (data.col(i).array() - data.col(i).mean()).matrix().transpose() *
-                                (data.col(j).array() - data.col(j).mean()).matrix();
-            covariance_matrix(i, j) = covariance;
-        }
-    }
-    // todo: benchmark, benchmark, benchmark (move n_samples in the loop, and ultimately try
-    // vectorization)
+
+    MatrixXd centered = data.rowwise() - data.colwise().mean();
+    MatrixXd covariance_matrix = (centered.adjoint() * centered);
     return covariance_matrix / n_samples;
 }
 
@@ -24,42 +17,38 @@ MatrixXd compute_covariance(const MatrixXd &data, const VectorXi &interventions_
     int n_variables = data.cols();
     int n_interventions = interventions_index.maxCoeff() + 1;
     int n_samples = data.rows();
-    Eigen::VectorXd means = data.colwise().mean();
+    // With interventions, the covariance matrix is of size (n_variables + n_interventions)^2
+    // Top left is the covariance matrix of the variables
+    // Top right and bottom left are the covariances between variables and interventions
+    // Bottom right is the covariance matrix of the interventions
 
     MatrixXd covariance_matrix(n_variables + n_interventions, n_variables + n_interventions);
-    for (int i = 0; i < n_variables + n_interventions; ++i) {
-        for (int j = 0; j <= i; ++j) {
-            Eigen::VectorXd x;
-            Eigen::VectorXd y;
-            if (i < n_variables) {
-                x = data.col(i).array() - means(i);
-            } else {
-                int i_intervention = i - n_variables;
-                x = Eigen::VectorXd::Zero(n_samples);
-                // set x to 1 for samples where the intervention is active
-                for (int k = 0; k < n_samples; ++k) {
-                    if (interventions_index(k) == i_intervention) { x(k) = 1; }
-                }
-                x.array() -= x.mean();
-            }
-            if (j < n_variables) {
-                y = data.col(j).array() - means(j);
-            } else {
-                int j_intervention = j - n_variables;
-                y = Eigen::VectorXd::Zero(n_samples);
-                // set y to 1 for samples where the intervention is active
-                for (int k = 0; k < n_samples; ++k) {
-                    if (interventions_index(k) == j_intervention) { y(k) = 1; }
-                }
-                y.array() -= y.mean();
-            }
-            double covariance = x.matrix().transpose() * y.matrix();
-            covariance_matrix(i, j) = covariance;
-            covariance_matrix(j, i) = covariance;
-        }
+
+    MatrixXd centered = data.rowwise() - data.colwise().mean();
+    covariance_matrix.topLeftCorner(n_variables, n_variables) = (centered.adjoint() * centered) / n_samples;
+
+
+    MatrixXd cov_obs_inter = MatrixXd::Zero(n_interventions, n_variables);
+    VectorXd means_inter = VectorXd::Zero(n_interventions);
+    MatrixXd cov_inter_inter = MatrixXd::Zero(n_interventions, n_interventions);
+
+    for (int i = 0; i < n_samples; ++i) {
+        int i_intervention = interventions_index(i);
+        if (i_intervention == -1) { continue; }
+        cov_obs_inter.row(i_intervention) += centered.row(i);
+        means_inter(i_intervention) += 1;
+        cov_inter_inter(i_intervention, i_intervention) += 1;
     }
-    // todo: benchmark, benchmark, benchmark, try vectorization
-    return covariance_matrix / n_samples;
+    cov_obs_inter /= n_samples;
+    means_inter /= n_samples;
+    cov_inter_inter /= n_samples;
+    cov_inter_inter -= means_inter * means_inter.transpose();// not sure this works
+
+    covariance_matrix.topRightCorner(n_variables, n_interventions) = cov_obs_inter.transpose();
+    covariance_matrix.bottomLeftCorner(n_interventions, n_variables) = cov_obs_inter;
+    covariance_matrix.bottomRightCorner(n_interventions, n_interventions) = cov_inter_inter;
+
+    return covariance_matrix;
 }
 
 BICScorer::BICScorer(const Eigen::MatrixXd &data, double alpha)
@@ -77,6 +66,14 @@ BICScorer::BICScorer(const Eigen::MatrixXd &data, const Eigen::VectorXi &interve
     n_samples = data.rows();
     cache.resize(n_variables);
 }
+
+double log_binomial(int n, int k) {
+    // use the fact that log(n choose k) = log(n!) - log(k!) - log((n-k)!)
+    // and log-gamma(n+1) = log(n!)
+    double log_n_choose_k = lgamma(n + 1) - lgamma(k + 1) - lgamma(n - k + 1);
+    return log_n_choose_k;
+}
+
 
 double BICScorer::local_score(int target, const FlatSet &parents) {
     // cache lookup
@@ -115,6 +112,9 @@ double BICScorer::local_score(int target, const FlatSet &parents) {
 
     // Calculating the BIC regularization term
     double bic_regularization = 0.5 * std::log(n_samples) * (parents.size() + 1) * alpha;
+
+    //    double prior_regularization = log_binomial(n_variables - 1, parents.size());
+    // makes things worse
 
     // Calculating the BIC score
     double bic = log_likelihood_no_constant - bic_regularization;
