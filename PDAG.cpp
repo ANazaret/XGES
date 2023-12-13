@@ -807,7 +807,11 @@ int PDAG::shd(const PDAG &other, bool allow_directed_in_other) const {
 }
 
 std::ostream &operator<<(std::ostream &os, const PDAG &obj) {
-    os << "PDAG: directed edges = {";
+    os << "PDAG: interventions edges = {";
+    for (auto edge: obj.get_directed_edges_interventions()) {
+        os << "(I" << edge.first - obj.num_variables << "-->" << edge.second << "), ";
+    }
+    os << "}, directed edges = {";
     for (auto edge: obj.get_directed_edges()) { os << "(" << edge.first << "-->" << edge.second << "), "; }
     os << "}, undirected edges = {";
     for (auto edge: obj.get_undirected_edges()) { os << "(" << edge.first << "---" << edge.second << "), "; }
