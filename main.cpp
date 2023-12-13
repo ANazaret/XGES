@@ -5,6 +5,7 @@
 #include <fstream>
 #include <iostream>
 namespace fs = std::filesystem;
+using namespace std::chrono;
 
 #include "dependencies/cxxopts.hpp"
 
@@ -58,8 +59,12 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < m.cols(); ++i) { interventions_candidate_variables.push_back({i}); }
     }
     // fix this by using only one constructor with good defaults
+    auto start = high_resolution_clock::now();
     BICScorer scorer =
             (args.count("interventions") > 0) ? BICScorer(m, m_interventions, alpha) : BICScorer(m, alpha);
+    double elapsed_secs = duration_cast<duration<double>>(high_resolution_clock::now() - start).count();
+
+    std::cout << "Time computing covariance: " << elapsed_secs << std::endl;
 
     XGES xges = (args.count("interventions") > 0) ? XGES(m, interventions_candidate_variables, &scorer)
                                                   : XGES(m, &scorer);
@@ -78,11 +83,10 @@ int main(int argc, char *argv[]) {
     } else {
         xges.deletion_threshold = 1e-10;
     }
-    clock_t start = clock();
+    start = high_resolution_clock::now();
     xges.fit_heuristic(args["o"].as<int>());
-    clock_t end = clock();
-    double elapsed_secs = double(end - start) / CLOCKS_PER_SEC;
-    std::cout << "Time elapsed: " << elapsed_secs << std::endl;
+    elapsed_secs = duration_cast<duration<double>>(high_resolution_clock::now() - start).count();
+    std::cout << "Time searching: " << elapsed_secs << std::endl;
     std::cout << "Score: " << xges.get_score() << std::endl;
     std::cout << "Score check: " << scorer.score_pdag(xges.get_pdag()) << std::endl;
     std::cout << "score_increase, " << xges.get_score() - xges.initial_score << std::endl;
