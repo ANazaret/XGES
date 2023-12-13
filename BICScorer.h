@@ -5,6 +5,7 @@
 #pragma once
 
 #include "ScorerInterface.h"
+#define EIGEN_USE_BLAS
 #include <Eigen/Dense>
 #include <map>
 #include <set>
@@ -12,6 +13,7 @@
 #include <vector>
 
 using Eigen::MatrixXd;
+using Eigen::VectorXd;
 using Eigen::VectorXi;
 
 // Specialize std::hash for std::set<int>

@@ -6,6 +6,8 @@
 
 #include "PDAG.h"
 #include "ScorerInterface.h"
+
+#define EIGEN_USE_BLAS
 #include <Eigen/Dense>
 
 using Eigen::MatrixXd;
