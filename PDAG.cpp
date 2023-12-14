@@ -50,6 +50,14 @@ std::vector<std::pair<int, int>> PDAG::get_directed_edges() const {
     return edges;
 }
 
+std::vector<std::pair<int, int>> PDAG::get_directed_edges_interventions() const {
+    std::vector<std::pair<int, int>> edges;
+    for (const auto &node: nodes_interventions) {
+        for (int child: children.at(node)) { edges.emplace_back(node, child); }
+    }
+    return edges;
+}
+
 std::vector<std::pair<int, int>> PDAG::get_undirected_edges() const {
     std::vector<std::pair<int, int>> edges;
     // interventions cannot have undirected edge
