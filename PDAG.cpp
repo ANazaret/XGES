@@ -313,8 +313,8 @@ bool PDAG::is_delete_valid(const Delete &delet) const {
 
     // 3. O and Pa(y) are unchanged (technically only need O ∪ Pa(y) to be
     // unchanged)
-    // <=> delet.effective_parents == O ∪ Pa(y)
-    if (!equal_union(delet.effective_parents, delet.O, parents.at(y))) { return false; }
+    //    // <=> delet.effective_parents == O ∪ Pa(y) ∪ {x}
+    if (!equal_union_with_singleton(delet.effective_parents, delet.O, parents.at(y), x)) { return false; }
 
     // 4. O is a clique
     if (!is_clique(delet.O)) { return false; }
