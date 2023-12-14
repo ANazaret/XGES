@@ -826,3 +826,18 @@ std::ostream &operator<<(std::ostream &os, const PDAG &obj) {
     os << "}";
     return os;
 }
+
+bool PDAG::operator==(const PDAG &other) const {
+    if (number_of_directed_edges != other.number_of_directed_edges ||
+        number_of_undirected_edges != other.number_of_undirected_edges) {
+        return false;
+    }
+    if (nodes_variables.size() != other.nodes_variables.size()) { return false; }
+    for (int node: nodes_variables) {
+        if (children.at(node) != other.children.at(node) || parents.at(node) != other.parents.at(node) ||
+            neighbors.at(node) != other.neighbors.at(node)) {
+            return false;
+        }
+    }
+    return true;
+}

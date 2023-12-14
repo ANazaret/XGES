@@ -59,6 +59,9 @@ public:
     // read from file
     static PDAG from_file(const std::string &filename);
 
+    // ==
+    bool operator==(const PDAG &other) const;
+
     /**
      * Returns the number of edges in the PDAG.
      * @return The number of edges in the PDAG.
