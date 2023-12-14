@@ -169,7 +169,7 @@ void XGES::heuristic_turn_delete_insert(std::vector<Insert> &candidate_inserts,
                                    candidate_deletes);
         //        std::cout << "score=" << total_score << std::endl << std::endl;
     }
-    std::cout << "probable_duplicates = " << duplicate_inserts << std::endl;
+    //    std::cout << "probable_duplicates = " << duplicate_inserts << std::endl;
 }
 
 void XGES::update_operator_candidates(EdgeModificationsMap &edge_modifications,

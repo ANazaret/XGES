@@ -292,7 +292,7 @@ bool PDAG::is_insert_valid(const Insert &insert, bool reverse) {
 }
 
 bool PDAG::is_reverse_valid(const Reverse &reverse) {
-    // TODO: wrong, need to check if the score to x has changed
+    // TODO: wrong, need to check if the score to x has changed: what did i mean here ...
     // is Pa(x) unchanged
     int x = reverse.insert.x;
     if (get_parents(x) != reverse.parents_x) { return false; }
@@ -698,8 +698,7 @@ PDAG PDAG::get_dag_extension() const {
         if (x == -1) {
             // raise error, no consistent extension possible
             std::cout << "no consistent extension possible" << std::endl;
-            // todo: raise error
-            break;
+            assert(false);
         }
         // Let all the edges which are adjacent to x in dag_tmp be directed toward x in dag_extension
         // node_tmp := node_tmp - x
