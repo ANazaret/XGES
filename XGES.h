@@ -30,7 +30,7 @@ private:
     void heuristic_turn_delete_insert(std::vector<Insert> &candidate_inserts,
                                       std::vector<Reverse> &candidate_reverses,
                                       std::vector<Delete> &candidate_deletes);
-    bool block_each_edge_and_research(int optimization);
+    void block_each_edge_and_research(int optimization);
 
     void find_delete_to_y_from_x(int y, int x, const FlatSet &parents_y,
                                  std::vector<Delete> &candidate_deletes, double threshold, bool directed_xy);

@@ -57,11 +57,13 @@ void XGES::heuristic_turn_delete_insert(std::vector<Insert> &candidate_inserts,
 
 
     // init the candidate inserts
-    std::cout << "n_variables = " << n_variables << std::endl;
     auto start_init_inserts = high_resolution_clock::now();
-    for (int y = 0; y < n_variables; ++y) {
-        // find all possible inserts to y
-        find_inserts_to_y(y, candidate_inserts, -1, false);
+    if (candidate_inserts.empty() && candidate_reverses.empty() && candidate_deletes.empty()) {
+        std::cout << "init inserts" << std::endl;
+        for (int y = 0; y < n_variables; ++y) {
+            // find all possible inserts to y
+            find_inserts_to_y(y, candidate_inserts, -1, false);
+        }
     }
     statistics["time- init_inserts"] =
             duration_cast<duration<double>>(high_resolution_clock::now() - start_init_inserts).count();
