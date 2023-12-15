@@ -341,6 +341,56 @@ void XGES::find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts, int 
     }
 }
 
+
+void XGES::find_delete_to_y_from_x(int y, int x, const FlatSet &parents_y,
+                                   std::vector<Delete> &candidate_deletes, double threshold,
+                                   bool directed_xy) {
+    auto neighbors_y_adjacent_x = pdag.get_neighbors_adjacent(y, x);
+
+    // find all possible O ⊆ [Ne(y) ∩ Ad(x)] that are cliques, quite similar to the inserts but simpler
+    // <O set of nodes, iterator over neighbors_y_adjacent_x, set of effective_parents>
+    std::stack<std::tuple<FlatSet, FlatSet::iterator, FlatSet>> stack;
+    // we know that O = {} is valid
+    FlatSet effective_parents_init;
+    effective_parents_init.reserve(parents_y.size() + neighbors_y_adjacent_x.size() + 1);
+    // note: Chickering Corollary 18 is incorrect. Pa(y) might not contain x, it has to be added.
+    union_with_single_element(parents_y, x, effective_parents_init);
+    stack.emplace(FlatSet{}, neighbors_y_adjacent_x.begin(), effective_parents_init);
+
+    while (!stack.empty()) {
+        auto top = std::move(stack.top());
+        stack.pop();
+        auto O = std::get<0>(top);
+        auto it = std::get<1>(top);
+        auto effective_parents = std::get<2>(top);
+
+        // change if we parallelize
+        double score = scorer->score_delete(y, effective_parents, x);
+        if (score > -threshold) {
+            candidate_deletes.emplace_back(x, y, O, score, effective_parents, directed_xy);
+            std::push_heap(candidate_deletes.begin(), candidate_deletes.end());
+        }
+
+        // Look for other candidate O using the iterator, which gives us the next elements z to consider.
+        while (it != neighbors_y_adjacent_x.end()) {
+            // We define O' = O ∪ {z} and we check if O' is a clique.
+            // Since O was a clique, we only need to check that z is adjacent to all nodes in O.
+            auto z = *it;
+            ++it;
+            auto &adjacent_z = pdag.get_adjacent(z);
+            // We check that O ⊆ Ad(z)
+            if (std::includes(adjacent_z.begin(), adjacent_z.end(), O.begin(), O.end())) {
+                // O' is a candidate
+                auto O_prime = O;
+                O_prime.insert(z);
+                auto effective_parents_prime = effective_parents;
+                effective_parents_prime.insert(z);
+                stack.emplace(std::move(O_prime), it, std::move(effective_parents_prime));
+            }
+        }
+    }
+}
+
 /** Find all possible deletes to y.
  *
  * The candidate deletes (x, y, H) are such that:
@@ -357,55 +407,9 @@ void XGES::find_deletes_to_y(int y, std::vector<Delete> &candidate_deletes, doub
     auto &neighbors_y = pdag.get_neighbors(y);
     auto &parents_y = pdag.get_parents(y);
 
-    std::vector<int> possible_x;
-    possible_x.insert(possible_x.end(), parents_y.begin(), parents_y.end());
-    possible_x.insert(possible_x.end(), neighbors_y.begin(), neighbors_y.end());
-
-    for (int x: possible_x) {
-        auto neighbors_y_adjacent_x = pdag.get_neighbors_adjacent(y, x);
-
-        // find all possible O ⊆ [Ne(y) ∩ Ad(x)] that are cliques, quite similar to the inserts but simpler
-        // <O set of nodes, iterator over neighbors_y_adjacent_x, set of effective_parents>
-        std::stack<std::tuple<FlatSet, FlatSet::iterator, FlatSet>> stack;
-        // we know that O = {} is valid
-        FlatSet effective_parents_init;
-        effective_parents_init.reserve(parents_y.size() + neighbors_y_adjacent_x.size() + 1);
-        // note: Chickering Corollary 18 is incorrect. Pa(y) might not contain x, it has to be added.
-        union_with_single_element(parents_y, x, effective_parents_init);
-        stack.emplace(FlatSet{}, neighbors_y_adjacent_x.begin(), effective_parents_init);
-
-        while (!stack.empty()) {
-            auto top = std::move(stack.top());
-            stack.pop();
-            auto O = std::get<0>(top);
-            auto it = std::get<1>(top);
-            auto effective_parents = std::get<2>(top);
-
-            // change if we parallelize
-            double score = scorer->score_delete(y, effective_parents, x);
-            if (score > -threshold) {
-                candidate_deletes.emplace_back(x, y, O, score, effective_parents);
-                std::push_heap(candidate_deletes.begin(), candidate_deletes.end());
-            }
-
-            // Look for other candidate O using the iterator, which gives us the next elements z to consider.
-            while (it != neighbors_y_adjacent_x.end()) {
-                // We define O' = O ∪ {z} and we check if O' is a clique.
-                // Since O was a clique, we only need to check that z is adjacent to all nodes in O.
-                auto z = *it;
-                ++it;
-                auto &adjacent_z = pdag.get_adjacent(z);
-                // We check that O ⊆ Ad(z)
-                if (std::includes(adjacent_z.begin(), adjacent_z.end(), O.begin(), O.end())) {
-                    // O' is a candidate
-                    auto O_prime = O;
-                    O_prime.insert(z);
-                    auto effective_parents_prime = effective_parents;
-                    effective_parents_prime.insert(z);
-                    stack.emplace(std::move(O_prime), it, std::move(effective_parents_prime));
-                }
-            }
-        }
+    for (int x: parents_y) { find_delete_to_y_from_x(y, x, parents_y, candidate_deletes, threshold, true); }
+    for (int x: neighbors_y) {
+        find_delete_to_y_from_x(y, x, parents_y, candidate_deletes, threshold, false);
     }
 }
 

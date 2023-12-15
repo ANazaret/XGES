@@ -35,7 +35,7 @@ private:
 
 class Delete {
 public:
-    Delete(int x, int y, const FlatSet &O, double score, const FlatSet &effective_parents);
+    Delete(int x, int y, const FlatSet &O, double score, const FlatSet &effective_parents, bool directed);
 
     friend std::ostream &operator<<(std::ostream &os, const Delete &obj);
 
@@ -48,6 +48,7 @@ public:
 
 private:
     int x, y;
+    bool directed;
     FlatSet O;
     FlatSet effective_parents;// O ∪ Pa(y)
     double score = 0;

@@ -32,7 +32,8 @@ private:
                                       std::vector<Delete> &candidate_deletes);
     bool block_each_edge_and_research(int optimization);
 
-    void initialize_fit(MatrixXd &data, ScorerInterface &scorer);
+    void find_delete_to_y_from_x(int y, int x, const FlatSet &parents_y,
+                                 std::vector<Delete> &candidate_deletes, double threshold, bool directed_xy);
 
 public:
     const double initial_score = 0;

@@ -17,11 +17,11 @@ std::ostream &operator<<(std::ostream &os, const Insert &obj) {
 }
 
 
-Delete::Delete(int x, int y, const FlatSet &O, double score, const FlatSet &effective_parents)
-    : x(x), y(y), O(O), score(score), effective_parents(effective_parents) {}
+Delete::Delete(int x, int y, const FlatSet &O, double score, const FlatSet &effective_parents, bool directed)
+    : x(x), y(y), O(O), score(score), effective_parents(effective_parents), directed(directed) {}
 
 std::ostream &operator<<(std::ostream &os, const Delete &obj) {
-    os << "Delete: " << obj.x << "-?-" << obj.y << ", O = {";
+    os << "Delete: " << obj.x << (obj.directed ? " → " : " - ") << obj.y << ", O = {";
     for (auto t: obj.O) { os << t << ", "; }
     os << "}, score = " << obj.score;
     os << ", effective_parents = {";
