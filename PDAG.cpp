@@ -20,6 +20,9 @@ PDAG::PDAG(int num_variables, int num_interventions)
         adjacent.emplace_back();
         adjacent_reachable.emplace_back();
         node_version.push_back(0);
+
+        forbidden_insert_parents.emplace_back();
+        forbidden_insert_children.emplace_back();
     }
     for (int i = 0; i < num_interventions; i++) {
         nodes_interventions.push_back(i + num_variables);
@@ -30,6 +33,9 @@ PDAG::PDAG(int num_variables, int num_interventions)
         adjacent.emplace_back();
         adjacent_reachable.emplace_back();
         node_version.push_back(0);
+
+        forbidden_insert_parents.emplace_back();
+        forbidden_insert_children.emplace_back();
     }
 
     _block_semi_directed_path_visited.resize(num_variables);
@@ -231,7 +237,13 @@ bool PDAG::is_insert_valid(const Insert &insert, bool reverse) {
     int y = insert.y;
     auto &T = insert.T;
 
-    // add version thingy
+    // todo: add version thingy
+
+    // 0. check if edge is forbidden
+    if (insert_is_forbidden(x, y)) {
+        statistics["is_insert_valid: false 0"] += 1;
+        return false;
+    }
 
     auto &adjacent_x = adjacent.at(x);
     if (!reverse) {
