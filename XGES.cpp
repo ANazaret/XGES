@@ -34,6 +34,13 @@ XGES::XGES(const Eigen::MatrixXd &data, std::vector<FlatSet> interventions_candi
     }
 }
 
+XGES::XGES(const XGES &other)
+    : n_variables(other.n_variables), n_interventions(other.n_interventions), n_samples(other.n_samples),
+      scorer(other.scorer), pdag(other.pdag), total_score(other.total_score),
+      initial_score(other.initial_score),
+      interventions_candidate_variables(other.interventions_candidate_variables),
+      variables_candidate_interventions(other.variables_candidate_interventions),
+      deletion_threshold(other.deletion_threshold) {}
 
 
 void XGES::fit_heuristic(int optimization) {
@@ -46,11 +53,142 @@ void XGES::fit_heuristic(int optimization) {
     std::vector<Delete> candidate_deletes;
     candidate_deletes.reserve(n_variables);
     heuristic_turn_delete_insert(candidate_inserts, candidate_reverses, candidate_deletes);
+
     if (ground_truth_pdag != nullptr) {
         std::cout << "SHD=" << pdag.shd(*ground_truth_pdag) << std::endl;
         std::cout << "SHD-U=" << pdag.shd(*ground_truth_pdag, false) << std::endl;
         std::cout << "score-truth=" << scorer->score_pdag(*ground_truth_pdag) << std::endl;
     }
+
+    if (optimization <= 0) return;
+    // trick
+    block_each_edge_and_research(optimization);
+    if (ground_truth_pdag != nullptr) {
+        std::cout << "SHD=" << pdag.shd(*ground_truth_pdag) << std::endl;
+        std::cout << "SHD-U=" << pdag.shd(*ground_truth_pdag, false) << std::endl;
+        std::cout << "score-truth=" << scorer->score_pdag(*ground_truth_pdag) << std::endl;
+    }
+}
+
+std::ostream &operator<<(std::ostream &os, const EdgeType &edge_type) {
+    switch (edge_type) {
+        case EdgeType::DIRECTED_TO_X:
+            os << "DIRECTED_TO_X";
+            break;
+        case EdgeType::DIRECTED_TO_Y:
+            os << "DIRECTED_TO_Y";
+            break;
+        case EdgeType::UNDIRECTED:
+            os << "UNDIRECTED";
+            break;
+        case EdgeType::NONE:
+            os << "NONE";
+            break;
+    }
+    return os;
+}
+// print function for EdgeModification
+std::ostream &operator<<(std::ostream &os, const EdgeModification &edge_modification) {
+    os << edge_modification.x << " " << edge_modification.y << " " << edge_modification.old_type << " "
+       << edge_modification.new_type;
+    return os;
+}
+
+void XGES::block_each_edge_and_research(int optimization) {
+    std::vector<Delete> all_edge_deletes;
+    bool delete_were_updated;
+    bool one_more_step = true;
+    int index = 0;
+
+    while (one_more_step) {
+        one_more_step = false;
+
+        if (index >= all_edge_deletes.size()) {
+            all_edge_deletes.clear();
+            for (int y: pdag.get_nodes_variables()) {
+                find_deletes_to_y(y, all_edge_deletes, std::numeric_limits<double>::max());
+            }
+            delete_were_updated = true;
+            index = 0;
+        } else {
+            delete_were_updated = false;
+        }
+
+        //    // sort the deletes by score, not with a heap because we need to iterate over them
+        //    std::sort(all_edge_deletes.begin(), all_edge_deletes.end(),
+        //              [](const Delete &a, const Delete &b) { return a.score < b.score; });
+
+        for (; index < all_edge_deletes.size();) {
+            auto delete_ = all_edge_deletes[index];
+            //            std::cout << "trying " << delete_ << std::endl;
+            index++;
+            XGES xges_copy(*this);
+            EdgeModificationsMap edge_modifications;
+            std::vector<Insert> candidate_inserts;
+            std::vector<Reverse> candidate_reverses;
+            std::vector<Delete> candidate_deletes;
+
+            if (!pdag.is_delete_valid(delete_)) { continue; }
+            //            std::cout << "copy done" << std::endl;
+
+            xges_copy.pdag.apply_delete(delete_, edge_modifications);
+            xges_copy.total_score += delete_.score;
+            xges_copy.pdag.add_forbidden_insert(delete_.x, delete_.y);
+            //        if (pdag.has_undirected_edge(delete_.x, delete_.y)) {
+            //            xges_copy.pdag.add_forbidden_insert(delete_.y, delete_.x);
+            //        }
+
+            //            std::cout << "apply delete done" << std::endl;
+            // todo: figure out threshold
+            if (optimization == 2 || optimization == 4) {
+                xges_copy.deletion_threshold = -1e-10;
+            } else {
+                xges_copy.deletion_threshold = 1e-10;
+            }
+
+            update_operator_candidates(edge_modifications, candidate_inserts, candidate_reverses,
+                                       candidate_deletes);
+            //            std::cout << "found " << candidate_inserts.size() << " inserts, " << candidate_reverses.size()
+            //                      << " reverses, " << candidate_deletes.size() << " deletes" << std::endl;
+
+            if (candidate_inserts.size() > 3 * n_variables) {
+                // need to find where are they coming from ...
+                // print all edge modifications
+                //                std::cout << "edge_modifications" << std::endl;
+                for (auto &edge_modification_key_value: edge_modifications) {
+                    auto &edge = edge_modification_key_value.second;
+                    std::cout << edge_modification_key_value.second << "  ";
+                }
+                std::cout << std::endl;
+            }
+            if (candidate_inserts.empty() && candidate_reverses.empty() && candidate_deletes.empty()) {
+                // to avoid researching all inserts after/ maybe change that behavior
+                // if i observe big changes in o2, that will be the reason.
+                continue;
+            }
+            xges_copy.heuristic_turn_delete_insert(candidate_inserts, candidate_reverses, candidate_deletes);
+            if (pdag == xges_copy.pdag) { continue; }
+            double score_increase = xges_copy.total_score - total_score;
+            if (score_increase > 1e-7 * n_samples) {
+                // apply the first one that works
+                //                std::cout << "increase " << xges_copy.total_score - total_score << " with "
+                //                          << (pdag.has_undirected_edge(delete_.x, delete_.y) ? "(undirected) "
+                //                                                                             : "(directed) ")
+                //                          << delete_ << std::endl;
+                total_score = xges_copy.total_score;
+                pdag = xges_copy.pdag;
+                one_more_step = true;
+                break;
+            }
+        }
+
+        if (one_more_step) continue;
+        if (delete_were_updated) break;// delete were updated but none worked
+        else
+            one_more_step = true;// delete were not updated, so we can try again
+    }
+}
+
 void XGES::heuristic_turn_delete_insert(std::vector<Insert> &candidate_inserts,
                                         std::vector<Reverse> &candidate_reverses,
                                         std::vector<Delete> &candidate_deletes) {
@@ -59,7 +197,7 @@ void XGES::heuristic_turn_delete_insert(std::vector<Insert> &candidate_inserts,
     // init the candidate inserts
     auto start_init_inserts = high_resolution_clock::now();
     if (candidate_inserts.empty() && candidate_reverses.empty() && candidate_deletes.empty()) {
-        std::cout << "init inserts" << std::endl;
+        //        std::cout << "init inserts" << std::endl;
         for (int y = 0; y < n_variables; ++y) {
             // find all possible inserts to y
             find_inserts_to_y(y, candidate_inserts, -1, false);
@@ -67,7 +205,7 @@ void XGES::heuristic_turn_delete_insert(std::vector<Insert> &candidate_inserts,
     }
     statistics["time- init_inserts"] =
             duration_cast<duration<double>>(high_resolution_clock::now() - start_init_inserts).count();
-    std::cout << "candidate_inserts.size() = " << candidate_inserts.size() << std::endl;
+    //    std::cout << "candidate_inserts.size() = " << candidate_inserts.size() << std::endl;
 
     EdgeModificationsMap edge_modifications;
     int i_operations = 1;
@@ -95,7 +233,7 @@ void XGES::heuristic_turn_delete_insert(std::vector<Insert> &candidate_inserts,
                 pdag.apply_delete(best_delete, edge_modifications);
                 total_score += best_delete.score;
                 // log it
-                std::cout << i_operations << ". " << best_delete << std::endl;
+                //                std::cout << i_operations << ". " << best_delete << std::endl;
             } else {
                 continue;
             }
@@ -112,7 +250,7 @@ void XGES::heuristic_turn_delete_insert(std::vector<Insert> &candidate_inserts,
                 pdag.apply_reverse(best_reverse, edge_modifications);
                 total_score += best_reverse.score;
                 // log it
-                std::cout << i_operations << ". " << best_reverse << std::endl;
+                //                std::cout << i_operations << ". " << best_reverse << std::endl;
             } else {
                 continue;
             }
@@ -143,12 +281,12 @@ void XGES::heuristic_turn_delete_insert(std::vector<Insert> &candidate_inserts,
                         duration_cast<duration<double>>(high_resolution_clock::now() - start_time).count();
                 total_score += last_insert.score;
                 // log it
-                std::cout << i_operations << ". " << last_insert << std::endl;
+                //                std::cout << i_operations << ". " << last_insert << std::endl;
                 if (deletion_threshold < 0)
-                    deletion_threshold = std::max(0., last_insert.score - 1e-8 * n_samples);
+                    deletion_threshold = std::max(0., last_insert.score - 1e-7 * n_samples);
                 else
                     deletion_threshold =
-                            std::max(0., std::min(last_insert.score - 1e-8 * n_samples, deletion_threshold));
+                            std::max(0., std::min(last_insert.score - 1e-7 * n_samples, deletion_threshold));
             } else {
                 statistics["time- is_insert_valid false"] +=
                         duration_cast<duration<double>>(high_resolution_clock::now() - start_time).count();

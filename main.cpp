@@ -59,6 +59,7 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < m.cols(); ++i) { interventions_candidate_variables.push_back({i}); }
     }
     // fix this by using only one constructor with good defaults
+    std::cout << "Computing covariance" << std::endl;
     auto start = high_resolution_clock::now();
     BICScorer scorer =
             (args.count("interventions") > 0) ? BICScorer(m, m_interventions, alpha) : BICScorer(m, alpha);
@@ -68,6 +69,10 @@ int main(int argc, char *argv[]) {
 
     XGES xges = (args.count("interventions") > 0) ? XGES(m, interventions_candidate_variables, &scorer)
                                                   : XGES(m, &scorer);
+
+    // free the memory of m
+    m.resize(0, 0);
+
 
     PDAG graph_truth = (args.count("graph_truth") > 0)
                                ? PDAG::from_file(args["graph_truth"].as<std::string>())

@@ -42,7 +42,8 @@ public:
     XGES(const Eigen::MatrixXd &data, std::vector<FlatSet> interventions_candidate_variables,
          ScorerInterface *scorer);
 
-    void fit_heuristic();
+    // copy constructor
+    XGES(const XGES &other);
 
     void fit_heuristic(int optimization = 0);
 
