@@ -13,6 +13,12 @@ using namespace std::chrono;
 #include "cnpy.h"
 typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> RowMajorMatrixXd;
 
+template<typename T>
+RowMajorMatrixXd load_npy(const std::string &filename) {
+    cnpy::NpyArray arr = cnpy::npy_load(filename);
+    return Eigen::Map<RowMajorMatrixXd>(arr.data<T>(), arr.shape[0], arr.shape[1]);
+}
+
 int main(int argc, char *argv[]) {
     srand(0);// random seed
 
@@ -42,8 +48,18 @@ int main(int argc, char *argv[]) {
     fs::path output_path = args["output"].as<std::string>();
     double alpha = args["alpha"].as<double>();
 
-    cnpy::NpyArray arr = cnpy::npy_load(data_path);
-    RowMajorMatrixXd m = Eigen::Map<RowMajorMatrixXd>(arr.data<double>(), arr.shape[0], arr.shape[1]);
+    std::cout << "Loading Input: " << data_path << std::endl;
+    RowMajorMatrixXd m;
+    if (data_path.extension() == ".npy") {
+        m = load_npy<double>(data_path);
+    } else if (data_path.extension() == ".npz") {
+        cnpy::NpyArray arr = cnpy::npz_load(data_path, "gene_expression");
+        m = Eigen::Map<RowMajorMatrixXd>(arr.data<double>(), arr.shape[0], arr.shape[1]);
+    } else {
+        throw std::runtime_error("Unknown file extension");
+    }
+    std::cout << "Input shape: " << m.rows() << " " << m.cols() << std::endl;
+    std::cout << "m[0, 0:2] = " << m(0, 0) << " " << m(0, 1) << std::endl;
 
     // todo: uniformize how to configure intervention (number, parameters ...)
     // todo: uniformize num_ and n_
@@ -52,9 +68,18 @@ int main(int argc, char *argv[]) {
     std::vector<FlatSet> interventions_candidate_variables;
     if (args.count("interventions")) {
         fs::path interventions_path = args["interventions"].as<std::string>();
-        cnpy::NpyArray arr_interventions = cnpy::npy_load(interventions_path);
-        m_interventions =
-                Eigen::Map<Eigen::VectorXi>(arr_interventions.data<int32_t>(), arr_interventions.shape[0]);
+        if (interventions_path.extension() == ".npy") {
+            cnpy::NpyArray arr_interventions = cnpy::npy_load(interventions_path);
+            m_interventions = Eigen::Map<Eigen::VectorXi>(arr_interventions.data<int32_t>(),
+                                                          arr_interventions.shape[0]);
+        } else if (interventions_path.extension() == ".npz") {
+            cnpy::NpyArray arr_interventions = cnpy::npz_load(interventions_path, "perturbations");
+            m_interventions = Eigen::Map<Eigen::VectorXi>(arr_interventions.data<int32_t>(),
+                                                          arr_interventions.shape[0]);
+        } else {
+            throw std::runtime_error("Unknown file extension");
+        }
+
         // For now assume that intervention i targets variable i
         for (int i = 0; i < m.cols(); ++i) { interventions_candidate_variables.push_back({i}); }
     }
