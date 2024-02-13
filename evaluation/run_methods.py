@@ -759,6 +759,11 @@ def simulation1(
 
 # DEBUG = True
 if __name__ == "__main__":
+
+    data = simulation1(20, n_control=10_000, n_inter=0, edges_per_d=2, seed=0, normalize=True)
+    # save the data
+    np.save("data.npy", data[0])
+
     # data, _, _ = simulation1(20, n_control=10000, n_inter=0, edges_per_d=3, seed=0, normalize=True)
     # print(data.flags)
     # experiment_more_observational()
@@ -972,6 +977,6 @@ if __name__ == "__main__":
     # )
     # res_paper_3.to_csv("res-paper-1gb.csv", index=False)
 
-    tmp = pd.read_csv("../synthetic_data.csv")
-    g = run_xges(tmp, 2, threshold=False, extra_optim=1)
-    print(g)
+    # tmp = pd.read_csv("../synthetic_data.csv")
+    # g = run_xges(tmp, 2, threshold=False, extra_optim=1)
+    # print(g)

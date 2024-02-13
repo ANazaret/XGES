@@ -3,6 +3,7 @@
 //
 #include "PDAG.h"
 #include "set_ops.h"
+#include <algorithm>
 #include <fstream>
 #include <sstream>
 

@@ -4,9 +4,9 @@
 
 #pragma once
 
+#include <algorithm>
 #include <boost/container/flat_set.hpp>
 #include <boost/container/small_vector.hpp>
-#include <iostream>
 #include <set>
 
 typedef boost::container::flat_set<int, std::less<int>, boost::container::small_vector<int, 10>> FlatSet;

@@ -63,10 +63,8 @@ void EdgeModificationsMap::update_edge_directed(int x, int y, EdgeType old_type)
     if (x > y) {
         std::swap(x, y);
         new_type = EdgeType::DIRECTED_TO_X;
-        assert(old_type != EdgeType::DIRECTED_TO_Y);
         if (old_type == EdgeType::DIRECTED_TO_X) old_type = EdgeType::DIRECTED_TO_Y;
     } else {
-        assert(old_type != EdgeType::DIRECTED_TO_Y);
         new_type = EdgeType::DIRECTED_TO_Y;
     }
     update_edge_modification(x, y, old_type, new_type);
@@ -107,7 +105,6 @@ void EdgeModificationsMap::update_edge_modification(int small, int big, EdgeType
             edge_modifications.erase(edge_key);
         } else {
             // we update the type of the edge modification
-            assert(edge_modification->second.new_type == old_type);
             edge_modification->second.new_type = new_type;
         }
     } else {

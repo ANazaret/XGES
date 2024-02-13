@@ -8,7 +8,7 @@
 #include "ScorerInterface.h"
 
 #define EIGEN_USE_BLAS
-#include <Eigen/Dense>
+#include "Eigen/Dense"
 
 using Eigen::MatrixXd;
 

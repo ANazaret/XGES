@@ -2,9 +2,7 @@ cmake_minimum_required(VERSION 3.26)
 project(ges_cpp)
 
 set(CMAKE_CXX_STANDARD 23)
-set(EIGEN3_INCLUDE_DIR "eigen-3.4.0")
-include_directories(${EIGEN3_INCLUDE_DIR})
-add_subdirectory(cnpy)
+include_directories(Eigen)
 
 add_executable(
         ges_cpp main.cpp
@@ -25,8 +23,7 @@ add_executable(
         dependencies/cxxopts.hpp
 )
 
-# Include library headers
-# Include the cnpy directory
+add_subdirectory(cnpy)
 target_include_directories(ges_cpp PRIVATE cnpy)
 target_link_libraries(ges_cpp PRIVATE cnpy)
 
