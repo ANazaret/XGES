@@ -27,6 +27,8 @@ add_subdirectory(cnpy)
 target_include_directories(ges_cpp PRIVATE cnpy)
 target_link_libraries(ges_cpp PRIVATE cnpy)
 
+add_subdirectory(spdlog)
+target_link_libraries(ges_cpp PRIVATE spdlog::spdlog)
 
 find_package(Boost REQUIRED)
 target_link_libraries(ges_cpp PRIVATE Boost::boost)
