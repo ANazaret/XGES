@@ -70,29 +70,6 @@ void XGES::fit_heuristic(int optimization) {
     }
 }
 
-std::ostream &operator<<(std::ostream &os, const EdgeType &edge_type) {
-    switch (edge_type) {
-        case EdgeType::DIRECTED_TO_X:
-            os << "DIRECTED_TO_X";
-            break;
-        case EdgeType::DIRECTED_TO_Y:
-            os << "DIRECTED_TO_Y";
-            break;
-        case EdgeType::UNDIRECTED:
-            os << "UNDIRECTED";
-            break;
-        case EdgeType::NONE:
-            os << "NONE";
-            break;
-    }
-    return os;
-}
-// print function for EdgeModification
-std::ostream &operator<<(std::ostream &os, const EdgeModification &edge_modification) {
-    os << edge_modification.x << " " << edge_modification.y << " " << edge_modification.old_type << " "
-       << edge_modification.new_type;
-    return os;
-}
 
 void XGES::block_each_edge_and_research(int optimization) {
     std::vector<Delete> all_edge_deletes;

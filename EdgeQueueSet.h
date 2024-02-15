@@ -24,7 +24,6 @@ struct Edge {
 };
 
 class EdgeQueueSet {
-private:
     std::queue<Edge> edges_queue;
     std::set<Edge> edges_set;
 
@@ -57,6 +56,7 @@ public:
     int get_source() const;
 };
 
+
 #include <map>
 
 class EdgeModificationsMap {
@@ -70,11 +70,12 @@ public:
     void clear();
 
     std::map<std::pair<int, int>, EdgeModification>::iterator begin();
-    
+
     std::map<std::pair<int, int>, EdgeModification>::iterator end();
 
 
 private:
-    void update_edge_modification(int small, int big, EdgeType old_type, EdgeType new_type);
+    void update_edge_modification(int small, int big, EdgeType old_type,
+                                  EdgeType new_type);
     std::map<std::pair<int, int>, EdgeModification> edge_modifications;
 };

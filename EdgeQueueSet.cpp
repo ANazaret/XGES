@@ -3,6 +3,7 @@
 //
 
 #include "EdgeQueueSet.h"
+#include <iostream>
 
 void EdgeQueueSet::push_directed(int x, int y) {
     Edge e{x, y, EdgeType::DIRECTED_TO_Y};
@@ -43,7 +44,9 @@ bool EdgeModification::is_now_directed() const {
     return new_type == EdgeType::DIRECTED_TO_X || new_type == EdgeType::DIRECTED_TO_Y;
 }
 
-bool EdgeModification::is_now_undirected() const { return new_type == EdgeType::UNDIRECTED; }
+bool EdgeModification::is_now_undirected() const {
+    return new_type == EdgeType::UNDIRECTED;
+}
 
 int EdgeModification::get_target() const {
     if (new_type == EdgeType::DIRECTED_TO_X) return x;
@@ -109,7 +112,8 @@ void EdgeModificationsMap::update_edge_modification(int small, int big, EdgeType
         }
     } else {
         // we add the edge to the list of modified edges
-        edge_modifications.emplace(edge_key, EdgeModification(small, big, old_type, new_type));
+        edge_modifications.emplace(edge_key,
+                                   EdgeModification(small, big, old_type, new_type));
     }
 }
 
@@ -121,4 +125,28 @@ std::map<std::pair<int, int>, EdgeModification>::iterator EdgeModificationsMap::
 
 std::map<std::pair<int, int>, EdgeModification>::iterator EdgeModificationsMap::end() {
     return edge_modifications.end();
+}
+
+std::ostream &operator<<(std::ostream &os, const EdgeType &edge_type) {
+    switch (edge_type) {
+        case EdgeType::DIRECTED_TO_X:
+            os << "DIRECTED_TO_X";
+            break;
+        case EdgeType::DIRECTED_TO_Y:
+            os << "DIRECTED_TO_Y";
+            break;
+        case EdgeType::UNDIRECTED:
+            os << "UNDIRECTED";
+            break;
+        case EdgeType::NONE:
+            os << "NONE";
+            break;
+    }
+    return os;
+}
+// print function for EdgeModification
+std::ostream &operator<<(std::ostream &os, const EdgeModification &edge_modification) {
+    os << edge_modification.x << " " << edge_modification.y << " "
+       << edge_modification.old_type << " " << edge_modification.new_type;
+    return os;
 }
