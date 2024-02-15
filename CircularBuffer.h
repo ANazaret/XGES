@@ -10,26 +10,38 @@ template<class T>
 class CircularBuffer {
 private:
     std::unique_ptr<T[]> buffer;
-    int front_idx = 0;// index of the first element
-    int back_idx = 0; // index of the last element
+    int front_idx = 0;// index of the first element, e.g. 0 in [1,2,None,None]
+    int back_idx = 0; // index of the last element, e.g. 1 in [1,2,None,None]
     int max_size;
 
 public:
-    CircularBuffer<T>(int max_size) : buffer(std::unique_ptr<T[]>(new T[max_size])), max_size(max_size){};
+    explicit CircularBuffer(const int max_size)
+        : buffer(std::unique_ptr<T[]>(new T[max_size])), max_size(max_size){};
 
     // copy assignment
-    CircularBuffer<T> &operator=(const CircularBuffer<T> &other) {
+    CircularBuffer &operator=(const CircularBuffer<T> &other) {
         buffer = std::unique_ptr<T[]>(new T[other.max_size]);
         max_size = other.max_size;
         front_idx = other.front_idx;
         back_idx = other.back_idx;
         if (front_idx < back_idx)
-            std::copy(other.buffer.get() + front_idx, other.buffer.get() + back_idx, buffer.get());
+            std::copy(other.buffer.get() + front_idx, other.buffer.get() + back_idx,
+                      buffer.get());
         else if (front_idx > back_idx) {
-            std::copy(other.buffer.get() + front_idx, other.buffer.get() + max_size, buffer.get());
-            std::copy(other.buffer.get(), other.buffer.get() + back_idx, buffer.get() + max_size - front_idx);
+            std::copy(other.buffer.get() + front_idx, other.buffer.get() + max_size,
+                      buffer.get());
+            std::copy(other.buffer.get(), other.buffer.get() + back_idx,
+                      buffer.get() + max_size - front_idx);
         }
         return *this;
+    }
+
+
+    CircularBuffer(const CircularBuffer<T> &other)
+        : buffer(std::unique_ptr<T[]>(new T[other.max_size])), max_size(other.max_size) {
+        front_idx = other.front_idx;
+        back_idx = other.back_idx;
+        std::copy(other.buffer.get(), other.buffer.get() + max_size, buffer.get());
     }
 
     void push_back(T item) {
@@ -38,23 +50,23 @@ public:
     }
 
     T pop_back() {
-        if (empty()) throw std::runtime_error("CircularBuffer is empty");
+        if (empty()) { throw std::runtime_error("CircularBuffer is empty"); }
 
         // move back_idx back
-        back_idx = (back_idx - 1) % max_size;
+        back_idx = (back_idx + max_size - 1) % max_size;
         return buffer[back_idx];
     }
 
     T pop_front() {
-        if (empty()) throw std::runtime_error("CircularBuffer is empty");
+        if (empty()) { throw std::runtime_error("CircularBuffer is empty"); }
         T item = buffer[front_idx];
         front_idx = (front_idx + 1) % max_size;
         return item;
     }
 
-    bool empty() { return front_idx == back_idx; }
+    bool empty() const { return front_idx == back_idx; }
 
-    int size() {
+    int size() const {
         if (front_idx <= back_idx) return back_idx - front_idx;
         else
             return max_size + back_idx - front_idx;
@@ -63,12 +75,5 @@ public:
     void clear() {
         front_idx = 0;
         back_idx = 0;
-    }
-
-    CircularBuffer<T>(const CircularBuffer<T> &other)
-        : buffer(std::unique_ptr<T[]>(new T[other.max_size])), max_size(other.max_size) {
-        front_idx = other.front_idx;
-        back_idx = other.back_idx;
-        std::copy(other.buffer.get(), other.buffer.get() + max_size, buffer.get());
     }
 };
