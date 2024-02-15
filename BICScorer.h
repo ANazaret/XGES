@@ -8,7 +8,6 @@
 #define EIGEN_USE_BLAS
 #include "Eigen/Dense"
 #include <map>
-#include <set>
 #include <unordered_map>
 #include <vector>
 

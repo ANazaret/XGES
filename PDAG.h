@@ -9,10 +9,7 @@
 #include "Operators.h"
 #include "set_ops.h"
 #include <map>
-#include <queue>
-#include <set>
 #include <tuple>
-#include <unordered_map>
 #include <vector>
 
 // Define the PDAGModification enum class.
