@@ -9,53 +9,48 @@
 
 #define EIGEN_USE_BLAS
 #include "Eigen/Dense"
+#include "spdlog/logger.h"
 
 using Eigen::MatrixXd;
 
 class XGES {
 private:
     int n_variables;
-    int n_interventions = 0;
-    int n_samples;
     ScorerInterface *scorer;
-
-    std::vector<FlatSet> interventions_candidate_variables;
-    std::vector<FlatSet> variables_candidate_interventions;
 
     PDAG pdag;
     double total_score = 0;
-
-    //    void pre_selection
+    std::shared_ptr<spdlog::logger> _logger;
 
     void heuristic_turn_delete_insert(std::vector<Insert> &candidate_inserts,
                                       std::vector<Reverse> &candidate_reverses,
-                                      std::vector<Delete> &candidate_deletes);
-    void block_each_edge_and_research(int optimization);
+                                      std::vector<Delete> &candidate_deletes,
+                                      bool use_threshold, bool initialize_inserts = true);
+    void block_each_edge_and_research(bool use_threshold);
 
     void find_delete_to_y_from_x(int y, int x, const FlatSet &parents_y,
-                                 std::vector<Delete> &candidate_deletes, double threshold, bool directed_xy);
+                                 std::vector<Delete> &candidate_deletes, double threshold,
+                                 bool directed_xy);
 
 public:
     const double initial_score = 0;
-    XGES(const MatrixXd &data, ScorerInterface *scorer);
+    std::unique_ptr<PDAG> ground_truth_pdag;
 
-    XGES(const Eigen::MatrixXd &data, std::vector<FlatSet> interventions_candidate_variables,
-         ScorerInterface *scorer);
-
-    // copy constructor
+    XGES(int n_variables, ScorerInterface *scorer);
     XGES(const XGES &other);
 
-    void fit_heuristic(int optimization = 0);
+
+    void fit_xges(bool use_threshold, bool extended_search);
 
     double get_score() const;
-    PDAG *ground_truth_pdag = nullptr;
 
     const PDAG &get_pdag() const;
 
-    void find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts, int parent_x = -1,
-                           bool low_parent_only = false, bool positive_only = true);
+    void find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts,
+                           int parent_x = -1, bool positive_only = true);
 
-    void find_deletes_to_y(int y, std::vector<Delete> &candidate_deletes, double threshold = 0);
+    void find_deletes_to_y(int y, std::vector<Delete> &candidate_deletes,
+                           double threshold = 0);
 
     void find_reverse_to_y(int y, std::vector<Reverse> &candidate_reverses);
 
@@ -63,9 +58,7 @@ public:
 
     std::map<std::string, double> statistics;
 
-    inline bool node_is_intervention(int node) const { return node >= n_variables; }
-    double deletion_threshold = -1;// todo: if we enable starting from a pdag, we need to set this differently
-
+    double deletion_threshold = -1;
 
     void update_operator_candidates(EdgeModificationsMap &edge_modifications,
                                     std::vector<Insert> &candidate_inserts,
