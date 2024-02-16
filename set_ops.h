@@ -9,7 +9,12 @@
 #include <boost/container/small_vector.hpp>
 #include <set>
 
-typedef boost::container::flat_set<int, std::less<int>, boost::container::small_vector<int, 10>> FlatSet;
+// small_vector: vector with preallocated elements (here 10)
+// flat_set: wraps a sorted vector to provide a set interface
+//    very fast access and iterations, but slower insert/delete.
+typedef boost::container::flat_set<int, std::less<>,
+                                   boost::container::small_vector<int, 10>>
+        FlatSet;
 
 
 template<typename T>
@@ -29,7 +34,7 @@ bool have_overlap(const T &a, const T &b) {
 
 
 template<typename T>
-bool equal_union(const T &a, const T &b1, const T &b2) {
+bool a_equals_union_b1_b2(const T &a, const T &b1, const T &b2) {
     // Iterate over a and check that each element is in b1 or b2
     auto itb1 = b1.begin();
     auto itb2 = b2.begin();
@@ -52,7 +57,8 @@ bool equal_union(const T &a, const T &b1, const T &b2) {
 }
 
 template<typename T, typename U>
-bool equal_union_with_singleton(const T &a, const T &b1, const T &b2, const U b3_singleton) {
+bool a_equals_union_b1_b2_and_singleton(const T &a, const T &b1, const T &b2,
+                                        const U b3_singleton) {
     // Iterate over a and check that each element is in b1 or b2
     auto itb1 = b1.begin();
     auto itb2 = b2.begin();
