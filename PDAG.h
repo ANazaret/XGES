@@ -12,7 +12,6 @@
 #include <tuple>
 #include <vector>
 
-// Define the PDAGModification enum class.
 enum class PDAGModification {
     REMOVE_DIRECTED_EDGE = 1,
     REMOVE_UNDIRECTED_EDGE = 2,
@@ -20,13 +19,9 @@ enum class PDAGModification {
     ADD_UNDIRECTED_EDGE = 4
 };
 
-// Declare the PDAG class.
 class PDAG {
-private:
     int num_variables;
-    int num_interventions;
     std::vector<int> nodes_variables;
-    std::vector<int> nodes_interventions;
     std::vector<int> nodes_all;
     std::vector<FlatSet> children;
     std::vector<FlatSet> parents;
@@ -51,12 +46,10 @@ private:
 public:
     std::map<std::string, double> statistics;
 
-    explicit PDAG(int num_nodes, int num_interventions = 0);
+    explicit PDAG(int num_nodes);
 
-    // read from file
     static PDAG from_file(const std::string &filename);
 
-    // ==
     bool operator==(const PDAG &other) const;
 
     /**
@@ -69,7 +62,6 @@ public:
     int get_node_version(int node) const;
 
     std::vector<std::pair<int, int>> get_directed_edges() const;
-    std::vector<std::pair<int, int>> get_directed_edges_interventions() const;
     std::vector<std::pair<int, int>> get_undirected_edges() const;
 
 
@@ -84,6 +76,8 @@ public:
     const FlatSet &get_adjacent_reachable(int node) const;
 
     FlatSet get_neighbors_adjacent(int node_y, int node_x) const;
+
+    FlatSet get_neighbors_not_adjacent(int node_y, int node_x) const;
 
     bool is_clique(const FlatSet &nodes) const;
 
@@ -110,11 +104,13 @@ public:
 
     void apply_insert(const Insert &insert, EdgeModificationsMap &edge_modifications_map);
 
-    void apply_reverse(const Reverse &reverse, EdgeModificationsMap &edge_modifications_map);
+    void apply_reverse(const Reverse &reverse,
+                       EdgeModificationsMap &edge_modifications_map);
 
     void apply_delete(const Delete &delet, EdgeModificationsMap &edge_modifications_map);
 
-    void maintain_cpdag(EdgeQueueSet &edges_to_check, EdgeModificationsMap &edge_modifications_map);
+    void maintain_cpdag(EdgeQueueSet &edges_to_check,
+                        EdgeModificationsMap &edge_modifications_map);
 
     bool is_oriented_by_meek_rule_1(int x, int y) const;
 
@@ -129,23 +125,21 @@ public:
 
     const std::vector<int> &get_nodes_variables() const;
 
-    FlatSet get_neighbors_not_adjacent(int node_y, int node_x) const;
 
     friend std::ostream &operator<<(std::ostream &os, const PDAG &obj);
 
-    void add_edges_around(int x, int y, EdgeQueueSet &edgeQueueSet, bool is_directed = false);
+    void add_edges_around(int x, int y, EdgeQueueSet &edgeQueueSet,
+                          bool is_directed = false);
 
     PDAG get_dag_extension() const;
 
     std::string get_adj_string() const;
 
-    inline bool node_is_intervention(int node) const { return node >= num_variables; }
-
-    inline bool insert_is_forbidden(int x, int y) const {
+    bool insert_is_forbidden(const int x, const int y) const {
         return forbidden_insert_parents[y].find(x) != forbidden_insert_parents[y].end();
     }
 
-    inline void add_forbidden_insert(int parent, int y) {
+    void add_forbidden_insert(int parent, int y) {
         forbidden_insert_parents[y].insert(parent);
         forbidden_insert_children[parent].insert(y);
     }

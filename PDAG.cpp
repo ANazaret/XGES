@@ -9,10 +9,9 @@
 
 using namespace std::chrono;
 
-PDAG::PDAG(int num_variables, int num_interventions)
-    : num_variables(num_variables), num_interventions(num_interventions),
-      _block_semi_directed_path_queue(num_variables) {
-    for (int i = 0; i < num_variables; i++) {
+PDAG::PDAG(const int num_nodes)
+    : num_variables(num_nodes), _block_semi_directed_path_queue(num_nodes) {
+    for (int i = 0; i < num_nodes; i++) {
         nodes_variables.push_back(i);
         nodes_all.push_back(i);
         children.emplace_back();
@@ -25,27 +24,15 @@ PDAG::PDAG(int num_variables, int num_interventions)
         forbidden_insert_parents.emplace_back();
         forbidden_insert_children.emplace_back();
     }
-    for (int i = 0; i < num_interventions; i++) {
-        nodes_interventions.push_back(i + num_variables);
-        nodes_all.push_back(i + num_variables);
-        children.emplace_back();
-        parents.emplace_back();
-        neighbors.emplace_back();
-        adjacent.emplace_back();
-        adjacent_reachable.emplace_back();
-        node_version.push_back(0);
-
-        forbidden_insert_parents.emplace_back();
-        forbidden_insert_children.emplace_back();
-    }
-
-    _block_semi_directed_path_visited.resize(num_variables);
-    _block_semi_directed_path_blocked.resize(num_variables);
+    _block_semi_directed_path_visited.resize(num_nodes);
+    _block_semi_directed_path_blocked.resize(num_nodes);
 }
 
-int PDAG::get_number_of_edges() const { return number_of_directed_edges + number_of_undirected_edges; }
+int PDAG::get_number_of_edges() const {
+    return number_of_directed_edges + number_of_undirected_edges;
+}
 
-int PDAG::get_node_version(int node) const { return node_version.at(node); }
+int PDAG::get_node_version(const int node) const { return node_version.at(node); }
 
 const std::vector<int> &PDAG::get_nodes_variables() const { return nodes_variables; }
 
@@ -57,13 +44,6 @@ std::vector<std::pair<int, int>> PDAG::get_directed_edges() const {
     return edges;
 }
 
-std::vector<std::pair<int, int>> PDAG::get_directed_edges_interventions() const {
-    std::vector<std::pair<int, int>> edges;
-    for (const auto &node: nodes_interventions) {
-        for (int child: children.at(node)) { edges.emplace_back(node, child); }
-    }
-    return edges;
-}
 
 std::vector<std::pair<int, int>> PDAG::get_undirected_edges() const {
     std::vector<std::pair<int, int>> edges;
@@ -76,31 +56,33 @@ std::vector<std::pair<int, int>> PDAG::get_undirected_edges() const {
     return edges;
 }
 
-const FlatSet &PDAG::get_parents(int node) const { return parents[node]; }
+const FlatSet &PDAG::get_parents(const int node) const { return parents[node]; }
 
-const FlatSet &PDAG::get_children(int node) const { return children[node]; }
+const FlatSet &PDAG::get_children(const int node) const { return children[node]; }
 
-const FlatSet &PDAG::get_neighbors(int node) const { return neighbors[node]; }
+const FlatSet &PDAG::get_neighbors(const int node) const { return neighbors[node]; }
 
-const FlatSet &PDAG::get_adjacent(int node) const { return adjacent[node]; }
+const FlatSet &PDAG::get_adjacent(const int node) const { return adjacent[node]; }
 
-const FlatSet &PDAG::get_adjacent_reachable(int node) const { return adjacent_reachable.at(node); }
+const FlatSet &PDAG::get_adjacent_reachable(const int node) const {
+    return adjacent_reachable.at(node);
+}
 
-FlatSet PDAG::get_neighbors_adjacent(int node_y, int node_x) const {
+FlatSet PDAG::get_neighbors_adjacent(const int node_y, const int node_x) const {
     FlatSet result;
     const auto &neighbors_set = get_neighbors(node_y);
     const auto &adjacent_set = get_adjacent(node_x);
-    std::set_intersection(neighbors_set.begin(), neighbors_set.end(), adjacent_set.begin(),
-                          adjacent_set.end(), std::inserter(result, result.begin()));
+    std::ranges::set_intersection(neighbors_set, adjacent_set,
+                                  std::inserter(result, result.begin()));
     return result;
 }
 
-FlatSet PDAG::get_neighbors_not_adjacent(int node_y, int node_x) const {
+FlatSet PDAG::get_neighbors_not_adjacent(const int node_y, const int node_x) const {
     FlatSet result;
     const auto &neighbors_set = get_neighbors(node_y);
     const auto &adjacent_set = get_adjacent(node_x);
-    std::set_difference(neighbors_set.begin(), neighbors_set.end(), adjacent_set.begin(), adjacent_set.end(),
-                        std::inserter(result, result.begin()));
+    std::ranges::set_difference(neighbors_set, adjacent_set,
+                                std::inserter(result, result.begin()));
     return result;
 }
 
@@ -108,7 +90,9 @@ bool PDAG::is_clique(const FlatSet &nodes_subset) const {
     for (int node1: nodes_subset) {
         const FlatSet &adjacent_set = get_adjacent(node1);
         for (int node2: nodes_subset) {
-            if (node1 != node2 && adjacent_set.find(node2) == adjacent_set.end()) { return false; }
+            if (node1 != node2 && adjacent_set.find(node2) == adjacent_set.end()) {
+                return false;
+            }
         }
     }
     return true;
@@ -209,7 +193,10 @@ bool PDAG::block_semi_directed_paths(int src, int dst, const FlatSet &blocked_no
         auto &reachable = get_adjacent_reachable(node);
 
         for (int n: reachable) {
-            if (visited[n] || blocked[n] || (node == src && n == dst && ignore_direct_edge)) { continue; }
+            if (visited[n] || blocked[n] ||
+                (node == src && n == dst && ignore_direct_edge)) {
+                continue;
+            }
             if (n == dst) { return false; }
             queue.push_back(n);
             visited[n] = 1;
@@ -274,11 +261,11 @@ bool PDAG::is_insert_valid(const Insert &insert, bool reverse) {
     // <=> insert.effective_parents == [Ne(y) ∩ Ad(x)] ∪ T ∪ Pa(y)
     FlatSet ne_y_ad_x_T;
     // intersect effective_parents with Ad(x)
-    std::set_intersection(neighbors_y.begin(), neighbors_y.end(), adjacent_x.begin(), adjacent_x.end(),
-                          std::inserter(ne_y_ad_x_T, ne_y_ad_x_T.begin()));
+    std::ranges::set_intersection(neighbors_y, adjacent_x,
+                                  std::inserter(ne_y_ad_x_T, ne_y_ad_x_T.begin()));
     // todo: can easily be improved by doing the insertion manually with intersection
     ne_y_ad_x_T.insert(T.begin(), T.end());
-    if (!equal_union(insert.effective_parents, ne_y_ad_x_T, parents.at(y))) {
+    if (!a_equals_union_b1_b2(insert.effective_parents, ne_y_ad_x_T, parents.at(y))) {
         statistics["is_insert_valid: false 3"] += 1;
         return false;
     }
@@ -295,11 +282,13 @@ bool PDAG::is_insert_valid(const Insert &insert, bool reverse) {
     if (!block_semi_directed_paths(y, x, ne_y_ad_x_T, ignore_direct_edge)) {
         statistics["is_insert_valid: false 5"] += 1;
         statistics["time- block_semi_directed_paths: false"] +=
-                duration_cast<duration<double>>(high_resolution_clock::now() - start_time).count();
+                duration_cast<duration<double>>(high_resolution_clock::now() - start_time)
+                        .count();
         return false;
     }
     statistics["time- block_semi_directed_paths: true"] +=
-            duration_cast<duration<double>>(high_resolution_clock::now() - start_time).count();
+            duration_cast<duration<double>>(high_resolution_clock::now() - start_time)
+                    .count();
 
     return true;
 }
@@ -316,18 +305,25 @@ bool PDAG::is_delete_valid(const Delete &delet) const {
     // 1. x and y are neighbors or x is a parent of y [aka y is adjacent_reachable from x]
     int x = delet.x;
     int y = delet.y;
-    if (adjacent_reachable.at(x).find(y) == adjacent_reachable.at(x).end()) { return false; }
+    if (adjacent_reachable.at(x).find(y) == adjacent_reachable.at(x).end()) {
+        return false;
+    }
 
     // 2. O is a subset of Ne(y) ∩ Ad(x)
     // <=> O ⊆ Ne(y) and O ⊆ Ad(x)
     auto &neighbors_y = neighbors.at(y);
     auto &adjacent_x = adjacent.at(x);
-    if (!is_subset(delet.O, neighbors_y) || !is_subset(delet.O, adjacent_x)) { return false; }
+    if (!is_subset(delet.O, neighbors_y) || !is_subset(delet.O, adjacent_x)) {
+        return false;
+    }
 
     // 3. O and Pa(y) are unchanged (technically only need O ∪ Pa(y) to be
     // unchanged)
     //    // <=> delet.effective_parents == O ∪ Pa(y) ∪ {x}
-    if (!equal_union_with_singleton(delet.effective_parents, delet.O, parents.at(y), x)) { return false; }
+    if (!a_equals_union_b1_b2_and_singleton(delet.effective_parents, delet.O,
+                                            parents.at(y), x)) {
+        return false;
+    }
 
     // 4. O is a clique
     if (!is_clique(delet.O)) { return false; }
@@ -344,7 +340,8 @@ bool PDAG::is_delete_valid(const Delete &delet) const {
  *
  * @param insert
  */
-void PDAG::apply_insert(const Insert &insert, EdgeModificationsMap &edge_modifications_map) {
+void PDAG::apply_insert(const Insert &insert,
+                        EdgeModificationsMap &edge_modifications_map) {
     int x = insert.x;
     int y = insert.y;
     auto &T = insert.T;
@@ -400,17 +397,10 @@ void PDAG::apply_insert(const Insert &insert, EdgeModificationsMap &edge_modific
     // If x → y, then don't need to update the edges going to x
 
     maintain_cpdag(edges_to_check, edge_modifications_map);
-
-    // End: The graph is a CPDAG
-    // print changed edges
-    //    std::cout << "changed_edges.size() = " << changed_edges.size() << ": ";
-    //    for (auto edge: changed_edges) {
-    //        std::cout << edge.x << (edge.type == EdgeType::DIRECTED ? " → " : " - ") << edge.y << ", ";
-    //    }
-    //    std::cout << std::endl;
 }
 
-void PDAG::apply_reverse(const Reverse &reverse, EdgeModificationsMap &edge_modifications_map) {
+void PDAG::apply_reverse(const Reverse &reverse,
+                         EdgeModificationsMap &edge_modifications_map) {
     // Start: The graph is a CPDAG
 
     // todo: if we change the tracking of the edges, we'll have to add y → x here
@@ -422,24 +412,27 @@ void PDAG::apply_reverse(const Reverse &reverse, EdgeModificationsMap &edge_modi
     apply_insert(reverse.insert, edge_modifications_map);
 }
 
-void PDAG::apply_delete(const Delete &aDelete, EdgeModificationsMap &edge_modifications_map) {
+void PDAG::apply_delete(const Delete &aDelete,
+                        EdgeModificationsMap &edge_modifications_map) {
     // Start: The graph is a CPDAG
     if (has_directed_edge(aDelete.x, aDelete.y)) {
         // 1. remove the directed edge x → y
         remove_directed_edge(aDelete.x, aDelete.y);
-        edge_modifications_map.update_edge_none(aDelete.x, aDelete.y, EdgeType::DIRECTED_TO_Y);
+        edge_modifications_map.update_edge_none(aDelete.x, aDelete.y,
+                                                EdgeType::DIRECTED_TO_Y);
     } else {
         // 1. remove the undirected edge x - y
         remove_undirected_edge(aDelete.x, aDelete.y);
-        edge_modifications_map.update_edge_none(aDelete.x, aDelete.y, EdgeType::UNDIRECTED);
+        edge_modifications_map.update_edge_none(aDelete.x, aDelete.y,
+                                                EdgeType::UNDIRECTED);
     }
 
     // H = Ne(y) ∩ Ad(x) \ O
     FlatSet H;
     const auto &neighbors_y = get_neighbors(aDelete.y);
     const auto &adjacent_x = get_adjacent(aDelete.x);
-    std::set_intersection(neighbors_y.begin(), neighbors_y.end(), adjacent_x.begin(), adjacent_x.end(),
-                          std::inserter(H, H.begin()));
+    std::set_intersection(neighbors_y.begin(), neighbors_y.end(), adjacent_x.begin(),
+                          adjacent_x.end(), std::inserter(H, H.begin()));
     // TODO: can easily be improved by doing deletion with intersection
     for (int z: aDelete.O) { H.erase(z); }
 
@@ -455,7 +448,8 @@ void PDAG::apply_delete(const Delete &aDelete, EdgeModificationsMap &edge_modifi
         if (has_undirected_edge(aDelete.x, h)) {
             remove_undirected_edge(aDelete.x, h);
             add_directed_edge(aDelete.x, h);
-            edge_modifications_map.update_edge_directed(aDelete.x, h, EdgeType::UNDIRECTED);
+            edge_modifications_map.update_edge_directed(aDelete.x, h,
+                                                        EdgeType::UNDIRECTED);
         }
     }
     EdgeQueueSet edges_to_check;
@@ -543,8 +537,8 @@ bool PDAG::is_oriented_by_meek_rule_3(int x, int y) const {
     const auto &parent_y = parents.at(y);
     FlatSet candidates_z_w;
     // 2. z → y and w → y
-    std::set_intersection(neighbors_x.begin(), neighbors_x.end(), parent_y.begin(), parent_y.end(),
-                          std::inserter(candidates_z_w, candidates_z_w.begin()));
+    std::ranges::set_intersection(neighbors_x, parent_y,
+                                  std::inserter(candidates_z_w, candidates_z_w.begin()));
     for (auto candidate_z: candidates_z_w) {
         for (auto candidate_w: candidates_z_w) {
             // 3. z ≠ w
@@ -573,14 +567,16 @@ bool PDAG::is_oriented_by_meek_rule_4(int x, int y) const {
     const auto &neighbors_x = neighbors.at(x);
     const auto &neighbors_y = neighbors.at(y);
     FlatSet candidates_w;
-    std::set_intersection(neighbors_x.begin(), neighbors_x.end(), neighbors_y.begin(), neighbors_y.end(),
-                          std::inserter(candidates_w, candidates_w.begin()));
+    std::ranges::set_intersection(neighbors_x, neighbors_y,
+                                  std::inserter(candidates_w, candidates_w.begin()));
     for (auto candidate_w: candidates_w) {
         // 2. w → z and z → y
         for (auto candidate_z: children.at(candidate_w)) {
             if (children.at(candidate_z).find(y) != children.at(candidate_z).end()) {
                 // 3. z, x not adjacent
-                if (adjacent.at(candidate_z).find(x) == adjacent.at(candidate_z).end()) { return true; }
+                if (adjacent.at(candidate_z).find(x) == adjacent.at(candidate_z).end()) {
+                    return true;
+                }
             }
         }
     }
@@ -627,7 +623,8 @@ bool PDAG::is_part_of_v_structure(int x, int y) const {
  *
  * @param insert
  */
-void PDAG::maintain_cpdag(EdgeQueueSet &edges_to_check, EdgeModificationsMap &edge_modifications_map) {
+void PDAG::maintain_cpdag(EdgeQueueSet &edges_to_check,
+                          EdgeModificationsMap &edge_modifications_map) {
     // need to keep track of the modifications made to the graph
 
     while (!edges_to_check.empty()) {
@@ -639,8 +636,7 @@ void PDAG::maintain_cpdag(EdgeQueueSet &edges_to_check, EdgeModificationsMap &ed
         if (edge.type == EdgeType::DIRECTED_TO_Y) {
             // Check if the edge is still directed
             if (is_part_of_v_structure(x, y) || is_oriented_by_meek_rule_1(x, y) ||
-                is_oriented_by_meek_rule_2(x, y) || is_oriented_by_meek_rule_3(x, y) ||
-                node_is_intervention(x)) {
+                is_oriented_by_meek_rule_2(x, y) || is_oriented_by_meek_rule_3(x, y)) {
                 // The edge is still directed
                 continue;
             }
@@ -653,11 +649,12 @@ void PDAG::maintain_cpdag(EdgeQueueSet &edges_to_check, EdgeModificationsMap &ed
             assert(edge.type != EdgeType::DIRECTED_TO_X && edge.type != EdgeType::NONE);
             // Check if the edge is now directed
             if (is_oriented_by_meek_rule_1(x, y) || is_oriented_by_meek_rule_2(x, y) ||
-                is_oriented_by_meek_rule_3(x, y) || node_is_intervention(x)) {
+                is_oriented_by_meek_rule_3(x, y)) {
 
                 // The edge is now directed
-            } else if (is_oriented_by_meek_rule_1(y, x) || is_oriented_by_meek_rule_2(y, x) ||
-                       is_oriented_by_meek_rule_3(y, x) || node_is_intervention(y)) {
+            } else if (is_oriented_by_meek_rule_1(y, x) ||
+                       is_oriented_by_meek_rule_2(y, x) ||
+                       is_oriented_by_meek_rule_3(y, x)) {
                 // The edge is now directed
                 std::swap(x, y);
             } else {
@@ -750,7 +747,8 @@ std::string PDAG::get_adj_string() const {
         for (int node2: nodes_variables) {
             if (node == node2) {
                 line += "0, ";
-            } else if (has_undirected_edge(node, node2) || has_directed_edge(node, node2)) {
+            } else if (has_undirected_edge(node, node2) ||
+                       has_directed_edge(node, node2)) {
                 line += "1, ";
             } else {
                 line += "0, ";
@@ -782,7 +780,7 @@ PDAG PDAG::from_file(const std::string &filename) {
         }
     }
 
-    PDAG graph(nodes.size(), 0);
+    PDAG graph(nodes.size());
 
     // Read adjacency matrix lines
     int i = 0;
@@ -792,14 +790,10 @@ PDAG PDAG::from_file(const std::string &filename) {
         int j = 0;
         while (std::getline(ss, token, ',')) {
             int value = std::stoi(token);
-            if (value == 1 && i != j) {
-                graph.add_directed_edge(nodes[i], nodes[j]);
-                std::cout << "add_directed_edge(" << nodes[i] << ", " << nodes[j] << ")" << std::endl;
-            }
+            if (value == 1 && i != j) { graph.add_directed_edge(nodes[i], nodes[j]); }
             j++;
         }
         i++;
-        std::cout << "i = " << i << std::endl;
     }
     file.close();
     return graph;
@@ -810,15 +804,19 @@ int PDAG::shd(const PDAG &other, bool allow_directed_in_other) const {
     for (int node: nodes_variables) {
         for (int node2: nodes_variables) {
             if (node >= node2) { continue; }
-            if ((has_directed_edge(node, node2) && !other.has_directed_edge(node, node2)) ||
-                (has_directed_edge(node2, node) && !other.has_directed_edge(node2, node)) ||
-                (has_undirected_edge(node, node2) && !other.has_undirected_edge(node, node2)) ||
+            if ((has_directed_edge(node, node2) &&
+                 !other.has_directed_edge(node, node2)) ||
+                (has_directed_edge(node2, node) &&
+                 !other.has_directed_edge(node2, node)) ||
+                (has_undirected_edge(node, node2) &&
+                 !other.has_undirected_edge(node, node2)) ||
                 (adjacent.at(node).find(node2) == adjacent.at(node).end() &&
                  other.adjacent.at(node).find(node2) != other.adjacent.at(node).end())) {
                 shd++;
             }
             if (allow_directed_in_other && has_undirected_edge(node, node2) &&
-                (other.has_directed_edge(node, node2) || other.has_directed_edge(node2, node))) {
+                (other.has_directed_edge(node, node2) ||
+                 other.has_directed_edge(node2, node))) {
                 shd--;
             }
         }
@@ -827,14 +825,14 @@ int PDAG::shd(const PDAG &other, bool allow_directed_in_other) const {
 }
 
 std::ostream &operator<<(std::ostream &os, const PDAG &obj) {
-    os << "PDAG: interventions edges = {";
-    for (auto edge: obj.get_directed_edges_interventions()) {
-        os << "(I" << edge.first - obj.num_variables << "-->" << edge.second << "), ";
+    os << "PDAG: directed edges = {";
+    for (auto edge: obj.get_directed_edges()) {
+        os << "(" << edge.first << "-->" << edge.second << "), ";
     }
-    os << "}, directed edges = {";
-    for (auto edge: obj.get_directed_edges()) { os << "(" << edge.first << "-->" << edge.second << "), "; }
     os << "}, undirected edges = {";
-    for (auto edge: obj.get_undirected_edges()) { os << "(" << edge.first << "---" << edge.second << "), "; }
+    for (auto edge: obj.get_undirected_edges()) {
+        os << "(" << edge.first << "---" << edge.second << "), ";
+    }
     os << "}";
     return os;
 }
