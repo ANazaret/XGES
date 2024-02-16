@@ -3,6 +3,7 @@
 //
 #include "PDAG.h"
 #include "set_ops.h"
+#include "utils.h"
 #include <algorithm>
 #include <fstream>
 #include <sstream>
@@ -172,13 +173,14 @@ void PDAG::add_undirected_edge(int x, int y) {
  */
 bool PDAG::block_semi_directed_paths(int src, int dst, const FlatSet &blocked_nodes,
                                      bool ignore_direct_edge) {
-    statistics["call- block_semi_directed_paths"] += 1;
     if (src == dst) { return false; }
+    statistics["block_semi_directed_paths-#calls"] += 1;
+    auto start_time = high_resolution_clock::now();
     // BFS search from y to x, using adjacent_reachable edges, avoiding blocked nodes
     auto &visited = _block_semi_directed_path_visited;
-    std::fill(visited.begin(), visited.end(), 0);
+    std::ranges::fill(visited, 0);
     auto &blocked = _block_semi_directed_path_blocked;
-    std::fill(blocked.begin(), blocked.end(), 0);
+    std::ranges::fill(blocked, 0);
 
     for (int n: blocked_nodes) { blocked[n] = 1; }
 
@@ -197,11 +199,18 @@ bool PDAG::block_semi_directed_paths(int src, int dst, const FlatSet &blocked_no
                 (node == src && n == dst && ignore_direct_edge)) {
                 continue;
             }
-            if (n == dst) { return false; }
+            if (n == dst) {
+                statistics["block_semi_directed_paths-false-#"] += 1;
+                statistics["block_semi_directed_paths-false-time"] +=
+                        measure_time(start_time);
+                return false;
+            }
             queue.push_back(n);
             visited[n] = 1;
         }
     }
+    statistics["block_semi_directed_paths-true-#"] += 1;
+    statistics["block_semi_directed_paths-true-time"] += measure_time(start_time);
     return true;
 }
 
@@ -220,7 +229,8 @@ bool PDAG::block_semi_directed_paths(int src, int dst, const FlatSet &blocked_no
  * @return ??
  */
 bool PDAG::is_insert_valid(const Insert &insert, bool reverse) {
-    statistics["call- is_insert_valid"] += 1;
+    auto start_time = high_resolution_clock::now();
+    statistics["is_insert_valid-#calls"] += 1;
     int x = insert.x;
     int y = insert.y;
     auto &T = insert.T;
@@ -229,7 +239,8 @@ bool PDAG::is_insert_valid(const Insert &insert, bool reverse) {
 
     // 0. check if edge is forbidden
     if (insert_is_forbidden(x, y)) {
-        statistics["is_insert_valid: false 0"] += 1;
+        statistics["is_insert_valid-false_0-#"] += 1;
+        statistics["is_insert_valid-false-time"] += measure_time(start_time);
         return false;
     }
 
@@ -237,14 +248,16 @@ bool PDAG::is_insert_valid(const Insert &insert, bool reverse) {
     if (!reverse) {
         // 1. x and y are not adjacent
         if (adjacent_x.find(y) != adjacent_x.end()) {
-            statistics["is_insert_valid: false 1a"] += 1;
+            statistics["is_insert_valid-false_1a-#"] += 1;
+            statistics["is_insert_valid-false-time"] += measure_time(start_time);
             return false;
         }
     } else {
         // 1. x ← y
         auto &parents_x = parents.at(x);
         if (parents_x.find(y) == parents_x.end()) {
-            statistics["is_insert_valid: false 1b"] += 1;
+            statistics["is_insert_valid-false_1b-#"] += 1;
+            statistics["is_insert_valid-false-time"] += measure_time(start_time);
             return false;
         }
     }
@@ -253,7 +266,8 @@ bool PDAG::is_insert_valid(const Insert &insert, bool reverse) {
     // <=> T ⊆ Ne(y) and T does not intersect Ad(x)
     auto &neighbors_y = neighbors.at(y);
     if (!is_subset(T, neighbors_y) || have_overlap(T, adjacent_x)) {
-        statistics["is_insert_valid: false 2"] += 1;
+        statistics["is_insert_valid-false_2-#"] += 1;
+        statistics["is_insert_valid-false-time"] += measure_time(start_time);
         return false;
     }
 
@@ -266,35 +280,36 @@ bool PDAG::is_insert_valid(const Insert &insert, bool reverse) {
     // todo: can easily be improved by doing the insertion manually with intersection
     ne_y_ad_x_T.insert(T.begin(), T.end());
     if (!a_equals_union_b1_b2(insert.effective_parents, ne_y_ad_x_T, parents.at(y))) {
-        statistics["is_insert_valid: false 3"] += 1;
+        statistics["is_insert_valid-false_3-#"] += 1;
+        statistics["is_insert_valid-false-time"] += measure_time(start_time);
         return false;
     }
 
     // 4. [Ne(y) ∩ Ad(x)] ∪ T is a clique
     if (!is_clique(ne_y_ad_x_T)) {
-        statistics["is_insert_valid: false 4"] += 1;
+        statistics["is_insert_valid-false_4-#"] += 1;
+        statistics["is_insert_valid-false-time"] += measure_time(start_time);
         return false;
     }
 
     // 5. [Ne(y) ∩ Ad(x)] ∪ T block all semi-directed paths from y to x
     bool ignore_direct_edge = reverse;
-    auto start_time = high_resolution_clock::now();
+    if (reverse) {
+        // insert Ne(x) into ne_y_ad_x_T to have [Ne(y) ∩ Ad(x)] ∪ T ∪ Ne(x)
+        ne_y_ad_x_T.insert(neighbors.at(x).begin(), neighbors.at(x).end());
+    };
     if (!block_semi_directed_paths(y, x, ne_y_ad_x_T, ignore_direct_edge)) {
-        statistics["is_insert_valid: false 5"] += 1;
-        statistics["time- block_semi_directed_paths: false"] +=
-                duration_cast<duration<double>>(high_resolution_clock::now() - start_time)
-                        .count();
+        statistics["is_insert_valid-false_5-#"] += 1;
+        statistics["is_insert_valid-false-time"] += measure_time(start_time);
         return false;
     }
-    statistics["time- block_semi_directed_paths: true"] +=
-            duration_cast<duration<double>>(high_resolution_clock::now() - start_time)
-                    .count();
 
+    statistics["is_insert_valid-true-#"] += 1;
+    statistics["is_insert_valid-true-time"] += measure_time(start_time);
     return true;
 }
 
 bool PDAG::is_reverse_valid(const Reverse &reverse) {
-    // TODO: wrong, need to check if the score to x has changed: what did i mean here ...
     // is Pa(x) unchanged
     int x = reverse.insert.x;
     if (get_parents(x) != reverse.parents_x) { return false; }
@@ -303,8 +318,8 @@ bool PDAG::is_reverse_valid(const Reverse &reverse) {
 
 bool PDAG::is_delete_valid(const Delete &delet) const {
     // 1. x and y are neighbors or x is a parent of y [aka y is adjacent_reachable from x]
-    int x = delet.x;
-    int y = delet.y;
+    const int x = delet.x;
+    const int y = delet.y;
     if (adjacent_reachable.at(x).find(y) == adjacent_reachable.at(x).end()) {
         return false;
     }
@@ -342,6 +357,7 @@ bool PDAG::is_delete_valid(const Delete &delet) const {
  */
 void PDAG::apply_insert(const Insert &insert,
                         EdgeModificationsMap &edge_modifications_map) {
+    auto start_time = high_resolution_clock::now();
     int x = insert.x;
     int y = insert.y;
     auto &T = insert.T;
@@ -397,6 +413,7 @@ void PDAG::apply_insert(const Insert &insert,
     // If x → y, then don't need to update the edges going to x
 
     maintain_cpdag(edges_to_check, edge_modifications_map);
+    statistics["apply_insert-time"] += measure_time(start_time);
 }
 
 void PDAG::apply_reverse(const Reverse &reverse,
@@ -414,6 +431,7 @@ void PDAG::apply_reverse(const Reverse &reverse,
 
 void PDAG::apply_delete(const Delete &aDelete,
                         EdgeModificationsMap &edge_modifications_map) {
+    auto start_time = high_resolution_clock::now();
     // Start: The graph is a CPDAG
     if (has_directed_edge(aDelete.x, aDelete.y)) {
         // 1. remove the directed edge x → y
@@ -431,8 +449,7 @@ void PDAG::apply_delete(const Delete &aDelete,
     FlatSet H;
     const auto &neighbors_y = get_neighbors(aDelete.y);
     const auto &adjacent_x = get_adjacent(aDelete.x);
-    std::set_intersection(neighbors_y.begin(), neighbors_y.end(), adjacent_x.begin(),
-                          adjacent_x.end(), std::inserter(H, H.begin()));
+    std::ranges::set_intersection(neighbors_y, adjacent_x, std::inserter(H, H.begin()));
     // TODO: can easily be improved by doing deletion with intersection
     for (int z: aDelete.O) { H.erase(z); }
 
@@ -460,6 +477,7 @@ void PDAG::apply_delete(const Delete &aDelete,
         add_edges_around(aDelete.x, h, edges_to_check, true);// shouldnt make a difference
     }
     maintain_cpdag(edges_to_check, edge_modifications_map);
+    statistics["apply_delete-time"] += measure_time(start_time);
 }
 
 
@@ -495,11 +513,11 @@ void PDAG::add_edges_around(int x, int y, EdgeQueueSet &edgeQueueSet, bool is_di
  *  1. z → x
  *  2. z not adjacent to y
  */
-bool PDAG::is_oriented_by_meek_rule_1(int x, int y) const {
+bool PDAG::is_oriented_by_meek_rule_1(const int x, const int y) const {
     // 1. z → x
     for (int z: parents.at(x)) {
         // 2. z not adjacent to y
-        if (adjacent.at(z).find(y) == adjacent.at(z).end()) { return true; }
+        if (!adjacent.at(y).contains(z)) { return true; }
     }
     return false;
 }
@@ -512,11 +530,11 @@ bool PDAG::is_oriented_by_meek_rule_1(int x, int y) const {
  *  1. x → z
  *  2. z → y
  */
-bool PDAG::is_oriented_by_meek_rule_2(int x, int y) const {
+bool PDAG::is_oriented_by_meek_rule_2(const int x, const int y) const {
     // 1. x → z
-    for (int z: children.at(x)) {
+    for (const int z: children.at(x)) {
         // 2. z → y
-        if (children.at(z).find(y) != children.at(z).end()) { return true; }
+        if (children.at(z).contains(y)) { return true; }
     }
     return false;
 }
@@ -681,7 +699,7 @@ PDAG PDAG::get_dag_extension() const {
     // todo: check only using nodes_variables is ok
     std::set<int> nodes_tmp(nodes_variables.begin(), nodes_variables.end());
 
-    while (nodes_tmp.size() > 0) {
+    while (nodes_tmp.empty()) {
         // find a node x that:
         // 1. has no children (children[x] = ∅)
         // 2. For every neighbor y of x, y is adjacent to all the other vertices which are adjacent to x;
@@ -731,7 +749,7 @@ PDAG PDAG::get_dag_extension() const {
 }
 
 std::string PDAG::get_adj_string() const {
-    std::string result = "";
+    std::string result;
     // first line, each node
     for (int node: nodes_variables) { result += std::to_string(node) + ", "; }
     // remove last ", "
@@ -740,10 +758,9 @@ std::string PDAG::get_adj_string() const {
         result.pop_back();
     }
     result += "\n";
-    std::string line;
     // other line: adjacency matrix (0,1)
     for (int node: nodes_variables) {
-        line = "";
+        std::string line;
         for (int node2: nodes_variables) {
             if (node == node2) {
                 line += "0, ";

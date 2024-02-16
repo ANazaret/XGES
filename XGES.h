@@ -30,7 +30,7 @@ private:
 
     void find_delete_to_y_from_x(int y, int x, const FlatSet &parents_y,
                                  std::vector<Delete> &candidate_deletes, double threshold,
-                                 bool directed_xy);
+                                 bool directed_xy) const;
 
 public:
     const double initial_score = 0;
@@ -50,7 +50,7 @@ public:
                            int parent_x = -1, bool positive_only = true);
 
     void find_deletes_to_y(int y, std::vector<Delete> &candidate_deletes,
-                           double threshold = 0);
+                           double threshold = 0) const;
 
     void find_reverse_to_y(int y, std::vector<Reverse> &candidate_reverses);
 

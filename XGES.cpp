@@ -19,8 +19,8 @@ XGES::XGES(const int n_variables, ScorerInterface *scorer)
 
 XGES::XGES(const XGES &other)
     : n_variables(other.n_variables), scorer(other.scorer), pdag(other.pdag),
-      total_score(other.total_score), initial_score(other.initial_score),
-      deletion_threshold(other.deletion_threshold), _logger(other._logger) {
+      total_score(other.total_score), _logger(other._logger),
+      initial_score(other.initial_score), deletion_threshold(other.deletion_threshold) {
     // We don't copy the pointer to the ground truth PDAG. Change if needed.
 }
 
@@ -86,23 +86,9 @@ void XGES::block_each_edge_and_research(const bool use_threshold) {
         //            xges_copy.pdag.add_forbidden_insert(delete_.y, delete_.x);
         //        }
 
-        //            std::cout << "apply delete done" << std::endl;
-        // todo: figure out threshold
-        if (use_threshold) {
-            xges_copy.deletion_threshold = -1e-10;
-        } else {
-            xges_copy.deletion_threshold = 1e-10;
-        }
-
         update_operator_candidates(edge_modifications, candidate_inserts,
                                    candidate_reverses, candidate_deletes);
 
-        if (candidate_inserts.empty() && candidate_reverses.empty() &&
-            candidate_deletes.empty()) {
-            // TODO: i should have a flag in heuristic to say if i should
-            // search for new inserts or not
-            continue;
-        }
         xges_copy.heuristic_turn_delete_insert(candidate_inserts, candidate_reverses,
                                                candidate_deletes, use_threshold, false);
         if (pdag == xges_copy.pdag) { continue; }
@@ -119,41 +105,32 @@ void XGES::heuristic_turn_delete_insert(std::vector<Insert> &candidate_inserts,
                                         std::vector<Reverse> &candidate_reverses,
                                         std::vector<Delete> &candidate_deletes,
                                         bool use_threshold, bool initialize_inserts) {
-
     if (use_threshold) {
         deletion_threshold = -1e-15;
     } else {
         deletion_threshold = 1e-15;
     }
 
-    // init the candidate inserts
-    auto start_init_inserts = high_resolution_clock::now();
     if (initialize_inserts) {
-        //        std::cout << "init inserts" << std::endl;
+        // find all possible inserts
+        auto start_init_inserts = high_resolution_clock::now();
         for (int y = 0; y < n_variables; ++y) {
-            // find all possible inserts to y
             find_inserts_to_y(y, candidate_inserts, -1, true);
         }
+        statistics["time- init_inserts"] +=
+                duration_cast<duration<double>>(high_resolution_clock::now() -
+                                                start_init_inserts)
+                        .count();
     }
-    statistics["time- init_inserts"] =
-            duration_cast<duration<double>>(high_resolution_clock::now() -
-                                            start_init_inserts)
-                    .count();
-    //    std::cout << "candidate_inserts.size() = " << candidate_inserts.size() << std::endl;
-
     EdgeModificationsMap edge_modifications;
     int i_operations = 1;
 
-    int duplicate_inserts = 0;
-    int n_inserts = 0;
     Insert last_insert(-1, -1, FlatSet{}, -1, FlatSet{});
 
-    // now do the heuristic
+    // XGES-0 main loop, in order: reverse, delete, insert; one operator per iteration
     while (!candidate_inserts.empty() || !candidate_reverses.empty() ||
            (!candidate_deletes.empty() &&
             candidate_deletes.front().score > -deletion_threshold)) {
-        // In order: reverse, delete, insert
-        // Apply only one operator per iteration
         edge_modifications.clear();
 
         if (!candidate_deletes.empty() &&
@@ -163,25 +140,20 @@ void XGES::heuristic_turn_delete_insert(std::vector<Insert> &candidate_inserts,
             auto best_delete = std::move(candidate_deletes.back());
             candidate_deletes.pop_back();
 
-            // check if it is still valid
             if (pdag.is_delete_valid(best_delete)) {
-                // apply the delete
                 pdag.apply_delete(best_delete, edge_modifications);
                 total_score += best_delete.score;
                 _logger->debug("{}: {}", i_operations, best_delete);
             } else {
                 continue;
             }
-
         } else if (!candidate_reverses.empty()) {
             // pop the best reverse
             std::pop_heap(candidate_reverses.begin(), candidate_reverses.end());
             auto best_reverse = std::move(candidate_reverses.back());
             candidate_reverses.pop_back();
 
-            // check if it is still valid
             if (pdag.is_reverse_valid(best_reverse)) {
-                // apply the reverse
                 pdag.apply_reverse(best_reverse, edge_modifications);
                 total_score += best_reverse.score;
                 _logger->debug("{}: {}", i_operations, best_reverse);
@@ -195,32 +167,17 @@ void XGES::heuristic_turn_delete_insert(std::vector<Insert> &candidate_inserts,
             auto best_insert = std::move(candidate_inserts.back());
             candidate_inserts.pop_back();
 
-            n_inserts++;
             if (best_insert.y == last_insert.y &&
                 abs(best_insert.score - last_insert.score) < 1e-10 &&
                 best_insert.x == last_insert.x && best_insert.T == last_insert.T) {
-                duplicate_inserts++;
+                statistics["probable_insert_duplicates"] += 1;
                 continue;
             }
             last_insert = std::move(best_insert);
 
-            // check if it is still valid
-            auto start_time = high_resolution_clock::now();
             if (pdag.is_insert_valid(last_insert)) {
-                // apply the insert
-                statistics["time- is_insert_valid true"] +=
-                        duration_cast<duration<double>>(high_resolution_clock::now() -
-                                                        start_time)
-                                .count();
-                start_time = high_resolution_clock::now();
                 pdag.apply_insert(last_insert, edge_modifications);
-                statistics["time- apply_insert"] +=
-                        duration_cast<duration<double>>(high_resolution_clock::now() -
-                                                        start_time)
-                                .count();
                 total_score += last_insert.score;
-                // log it
-                // log it
                 _logger->debug("{}: {}", i_operations, last_insert);
                 if (deletion_threshold < 0)
                     deletion_threshold = std::max(0., last_insert.score - 1e-7);
@@ -228,30 +185,23 @@ void XGES::heuristic_turn_delete_insert(std::vector<Insert> &candidate_inserts,
                     deletion_threshold = std::max(
                             0., std::min(last_insert.score - 1e-7, deletion_threshold));
             } else {
-                statistics["time- is_insert_valid false"] +=
-                        duration_cast<duration<double>>(high_resolution_clock::now() -
-                                                        start_time)
-                                .count();
                 continue;
             }
         }
         i_operations++;
 
-        //        candidate_inserts.clear();
-        //        candidate_reverses.clear();
-        //        candidate_deletes.clear();
-        //        for (int node: pdag.get_nodes()) {
-        //            find_inserts_to_y(node, candidate_inserts);
-        //            find_reverse_to_y(node, candidate_reverses);
-        //            find_deletes_to_y(node, candidate_deletes);
-        //        }
-        //        continue;
+        // candidate_inserts.clear();
+        // candidate_reverses.clear();
+        // candidate_deletes.clear();
+        // for (int node: pdag.get_nodes_variables()) {
+        //     find_inserts_to_y(node, candidate_inserts);
+        //     find_reverse_to_y(node, candidate_reverses);
+        //     find_deletes_to_y(node, candidate_deletes);
+        // }
 
         update_operator_candidates(edge_modifications, candidate_inserts,
-                                   candidate_reverses, candidate_deletes);
-        //        std::cout << "score=" << total_score << std::endl << std::endl;
+        candidate_reverses, candidate_deletes);
     }
-    //    std::cout << "probable_duplicates = " << duplicate_inserts << std::endl;
 }
 
 void XGES::update_operator_candidates(EdgeModificationsMap &edge_modifications,
@@ -267,9 +217,8 @@ void XGES::update_operator_candidates(EdgeModificationsMap &edge_modifications,
         if (edge.is_now_reverse() || edge.is_now_undirected()) {
             full_insert_to_y.insert(edge.x);
             full_insert_to_y.insert(edge.y);
-            std::set_intersection(
-                    pdag.get_neighbors(edge.x).begin(), pdag.get_neighbors(edge.x).end(),
-                    pdag.get_neighbors(edge.y).begin(), pdag.get_neighbors(edge.y).end(),
+            std::ranges::set_intersection(
+                    pdag.get_neighbors(edge.x), pdag.get_neighbors(edge.y),
                     std::inserter(full_insert_to_y, full_insert_to_y.begin()));
 
         } else if (edge.is_now_directed()) {
@@ -278,9 +227,8 @@ void XGES::update_operator_candidates(EdgeModificationsMap &edge_modifications,
             } else {
                 full_insert_to_y.insert(edge.x);
             }
-            std::set_intersection(
-                    pdag.get_neighbors(edge.x).begin(), pdag.get_neighbors(edge.x).end(),
-                    pdag.get_neighbors(edge.y).begin(), pdag.get_neighbors(edge.y).end(),
+            std::ranges::set_intersection(
+                    pdag.get_neighbors(edge.x), pdag.get_neighbors(edge.y),
                     std::inserter(full_insert_to_y, full_insert_to_y.begin()));
         } else {
             full_insert_to_y.insert(edge.x);
@@ -294,24 +242,26 @@ void XGES::update_operator_candidates(EdgeModificationsMap &edge_modifications,
         find_reverse_from_x(node, candidate_reverses);
         find_deletes_to_y(node, candidate_deletes, deletion_threshold);
     }
-    for (auto node: full_insert_to_y) { find_inserts_to_y(node, candidate_inserts); }
+    for (const auto node: full_insert_to_y) {
+        find_inserts_to_y(node, candidate_inserts);
+    }
 
     for (auto &edge_modification: edge_modifications) {
         // symmetric in x and y
         auto &edge = edge_modification.second;
         for (auto target: pdag.get_neighbors(edge.y)) {
-            if (full_insert_to_y.find(target) != full_insert_to_y.end()) { continue; }
+            if (full_insert_to_y.contains(target)) { continue; }
             find_inserts_to_y(target, candidate_inserts, edge.x);
         }
         for (auto target: pdag.get_neighbors(edge.x)) {
-            if (full_insert_to_y.find(target) != full_insert_to_y.end()) { continue; }
+            if (full_insert_to_y.contains(target)) { continue; }
             find_inserts_to_y(target, candidate_inserts, edge.y);
         }
 
         if (edge.is_now_directed()) {
             int x_ = edge.get_source();
             int y_ = edge.get_target();
-            if (full_insert_to_y.find(x_) == full_insert_to_y.end()) {
+            if (!full_insert_to_y.contains(x_)) {
                 for (auto source: pdag.get_adjacent(y_)) {
                     find_inserts_to_y(x_, candidate_inserts, source);
                 }
@@ -335,6 +285,8 @@ void XGES::update_operator_candidates(EdgeModificationsMap &edge_modifications,
  *
  * @param y
  * @param candidate_inserts
+ * @param parent_x
+ * @param positive_only
  */
 
 void XGES::find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts, int parent_x,
@@ -351,9 +303,9 @@ void XGES::find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts, int 
         auto &nodes = pdag.get_nodes_variables();
 
         // 1. x is not adjacent to y (x ∉ Ad(y))
-        std::set_difference(nodes.begin(), nodes.end(), adjacent_y.begin(),
-                            adjacent_y.end(),
-                            std::inserter(possible_parents, possible_parents.begin()));
+        std::ranges::set_difference(
+                nodes, adjacent_y,
+                std::inserter(possible_parents, possible_parents.begin()));
         possible_parents.erase(y);// only needed because we don't have pre-selection
     }
 
@@ -410,11 +362,8 @@ void XGES::find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts, int 
                 ++it;
                 auto &adjacent_z = pdag.get_adjacent(z);
                 // We check that C(x,y,T) ⊆ Ad(z); i.e. T ⊆ Ad(z) and [Ne(y) ∩ Ad(x)] ⊆ Ad(z).
-                if (std::includes(adjacent_z.begin(), adjacent_z.end(), T.begin(),
-                                  T.end()) &&
-                    std::includes(adjacent_z.begin(), adjacent_z.end(),
-                                  neighbors_y_adjacent_x.begin(),
-                                  neighbors_y_adjacent_x.end())) {
+                if (std::ranges::includes(adjacent_z, T) &&
+                    std::ranges::includes(adjacent_z, neighbors_y_adjacent_x)) {
                     // T' is a candidate
                     auto T_prime = T;
                     T_prime.insert(z);
@@ -431,7 +380,7 @@ void XGES::find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts, int 
 
 void XGES::find_delete_to_y_from_x(int y, int x, const FlatSet &parents_y,
                                    std::vector<Delete> &candidate_deletes,
-                                   double threshold, bool directed_xy) {
+                                   double threshold, bool directed_xy) const {
     auto neighbors_y_adjacent_x = pdag.get_neighbors_adjacent(y, x);
 
     // find all possible O ⊆ [Ne(y) ∩ Ad(x)] that are cliques, quite similar to the inserts but simpler
@@ -467,7 +416,7 @@ void XGES::find_delete_to_y_from_x(int y, int x, const FlatSet &parents_y,
             ++it;
             auto &adjacent_z = pdag.get_adjacent(z);
             // We check that O ⊆ Ad(z)
-            if (std::includes(adjacent_z.begin(), adjacent_z.end(), O.begin(), O.end())) {
+            if (std::ranges::includes(adjacent_z, O)) {
                 // O' is a candidate
                 auto O_prime = O;
                 O_prime.insert(z);
@@ -490,9 +439,10 @@ void XGES::find_delete_to_y_from_x(int y, int x, const FlatSet &parents_y,
  *
  * @param y
  * @param candidate_deletes
+ * @param threshold
  */
-void XGES::find_deletes_to_y(int y, std::vector<Delete> &candidate_deletes,
-                             double threshold) {
+void XGES::find_deletes_to_y(const int y, std::vector<Delete> &candidate_deletes,
+                             const double threshold) const {
     auto &neighbors_y = pdag.get_neighbors(y);
     auto &parents_y = pdag.get_parents(y);
 
@@ -512,7 +462,7 @@ void XGES::find_deletes_to_y(int y, std::vector<Delete> &candidate_deletes,
  *  Not enforced at that stage: [Ne(y) ∩ Ad(x)] ∪ T blocks all semi-directed paths from y to x (≠ than x ← y)
  *
  * @param y
- * @param candidate_inserts
+ * @param candidate_reverses
  */
 
 // can i just do insert x -> y?
@@ -525,7 +475,7 @@ void XGES::find_reverse_to_y(int y, std::vector<Reverse> &candidate_reverses) {
         std::vector<Insert> candidate_inserts;
         find_inserts_to_y(y, candidate_inserts, x, false);
 
-        for (auto insert: candidate_inserts) {
+        for (auto &insert: candidate_inserts) {
             // change if we parallelize
             double score = insert.score + scorer->score_delete(x, parents_x, y);
 
@@ -547,7 +497,7 @@ void XGES::find_reverse_from_x(int x, std::vector<Reverse> &candidate_reverses) 
         std::vector<Insert> candidate_inserts;
         find_inserts_to_y(y, candidate_inserts, x, false);
 
-        for (auto insert: candidate_inserts) {
+        for (auto &insert: candidate_inserts) {
             // change if we parallelize
             double score = insert.score + scorer->score_delete(x, parents_x, y);
 
