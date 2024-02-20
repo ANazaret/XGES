@@ -782,7 +782,7 @@ PDAG PDAG::get_dag_extension() const {
     PDAG dag_tmp = *this;
     std::set nodes_tmp(nodes_variables.begin(), nodes_variables.end());
 
-    while (nodes_tmp.empty()) {
+    while (!nodes_tmp.empty()) {
         // find a node x that:
         // 1. has no children (children[x] = ∅)
         // 2. For every neighbor y of x, y is adjacent to all the other vertices which are adjacent to x;
