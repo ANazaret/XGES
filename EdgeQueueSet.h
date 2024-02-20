@@ -3,7 +3,7 @@
 //
 
 #pragma once
-
+#include <map>
 #include <queue>
 #include <set>
 
@@ -80,8 +80,6 @@ public:
     int get_modification_id() const;
 };
 
-
-#include <map>
 
 class EdgeModificationsMap {
 public:
