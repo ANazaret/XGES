@@ -21,6 +21,7 @@ add_executable(
         BICScorer.h
         CircularBuffer.h
         dependencies/cxxopts.hpp
+        utils.h
 )
 
 add_subdirectory(cnpy)
