@@ -89,12 +89,12 @@ int main(int argc, char *argv[]) {
     XGES xges(n_variables, &scorer);
 
     if (args.count("graph_truth") > 0) {
-        std::unique_ptr<PDAG> ground_truth_pdag = std::make_unique<PDAG>(
+        auto ground_truth_pdag = std::make_unique<PDAG>(
                 PDAG::from_file(args["graph_truth"].as<std::string>()));
         xges.ground_truth_pdag = std::move(ground_truth_pdag);
     }
 
-    bool extended_search = args["0"].as<bool>();
+    bool extended_search = !args["0"].as<bool>();
     logger->info("Fitting XGES with extended search: {}", extended_search);
     start_time = high_resolution_clock::now();
     xges.fit_xges(extended_search);
@@ -123,5 +123,24 @@ int main(int argc, char *argv[]) {
     for (auto &kv: xges.get_pdag().statistics) {
         stats_file << kv.first << ", " << kv.second << std::endl;
     }
+    for (auto &kv: scorer.statistics) {
+        stats_file << kv.first << ", " << kv.second << std::endl;
+    }
     return 0;
+}
+
+
+void test_pdag() {
+    PDAG pdag(10);
+    pdag.add_undirected_edge(0, 1);
+    pdag.add_undirected_edge(1, 2);
+
+    PDAG dag_extension_true1(10);
+    dag_extension_true1.add_directed_edge(0, 1);
+    dag_extension_true1.add_directed_edge(1, 2);
+    PDAG dag_extension_true2(10);
+    dag_extension_true2.add_directed_edge(2, 1);
+    dag_extension_true2.add_directed_edge(1, 0);
+    assert(pdag.get_dag_extension() == dag_extension_true1 ||
+           pdag.get_dag_extension() == dag_extension_true2);
 }
