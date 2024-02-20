@@ -5,9 +5,21 @@
 #include "EdgeQueueSet.h"
 #include <iostream>
 
+Edge::Edge(int x, int y, EdgeType type) {
+    if (x > y) {
+        std::swap(x, y);
+        if (type == EdgeType::DIRECTED_TO_X) type = EdgeType::DIRECTED_TO_Y;
+        else if (type == EdgeType::DIRECTED_TO_Y)
+            type = EdgeType::DIRECTED_TO_X;
+    }
+    this->x = x;
+    this->y = y;
+    this->type = type;
+}
+
 void EdgeQueueSet::push_directed(int x, int y) {
     Edge e{x, y, EdgeType::DIRECTED_TO_Y};
-    if (edges_set.find(e) == edges_set.end()) {
+    if (!edges_set.contains(e)) {
         edges_queue.push(e);
         edges_set.insert(e);
     }
@@ -16,7 +28,7 @@ void EdgeQueueSet::push_directed(int x, int y) {
 void EdgeQueueSet::push_undirected(int x, int y) {
     if (x > y) std::swap(x, y);
     Edge e{x, y, EdgeType::UNDIRECTED};
-    if (edges_set.find(e) == edges_set.end()) {
+    if (!edges_set.contains(e)) {
         edges_queue.push(e);
         edges_set.insert(e);
     }
@@ -35,29 +47,59 @@ bool EdgeQueueSet::empty() const { return edges_queue.empty(); }
 EdgeModification::EdgeModification(int x, int y, EdgeType old_type, EdgeType new_type)
     : x(x), y(y), old_type(old_type), new_type(new_type) {}
 
-bool EdgeModification::is_now_reverse() const {
+bool EdgeModification::is_reverse() const {
     return (old_type == EdgeType::DIRECTED_TO_X && new_type == EdgeType::DIRECTED_TO_Y) ||
            (old_type == EdgeType::DIRECTED_TO_Y && new_type == EdgeType::DIRECTED_TO_X);
 }
 
-bool EdgeModification::is_now_directed() const {
+bool EdgeModification::is_new_directed() const {
     return new_type == EdgeType::DIRECTED_TO_X || new_type == EdgeType::DIRECTED_TO_Y;
 }
 
-bool EdgeModification::is_now_undirected() const {
+bool EdgeModification::is_old_directed() const {
+    return old_type == EdgeType::DIRECTED_TO_X || old_type == EdgeType::DIRECTED_TO_Y;
+}
+
+bool EdgeModification::is_new_undirected() const {
     return new_type == EdgeType::UNDIRECTED;
 }
 
-int EdgeModification::get_target() const {
-    if (new_type == EdgeType::DIRECTED_TO_X) return x;
-    if (new_type == EdgeType::DIRECTED_TO_Y) return y;
-    return -1;
+bool EdgeModification::is_old_undirected() const {
+    return old_type == EdgeType::UNDIRECTED;
 }
 
-int EdgeModification::get_source() const {
+int EdgeModification::get_new_target() const {
+    if (new_type == EdgeType::DIRECTED_TO_X) return x;
+    if (new_type == EdgeType::DIRECTED_TO_Y) return y;
+    throw std::runtime_error("New edge is not directed");
+}
+
+int EdgeModification::get_new_source() const {
     if (new_type == EdgeType::DIRECTED_TO_X) return y;
     if (new_type == EdgeType::DIRECTED_TO_Y) return x;
-    return -1;
+    throw std::runtime_error("New edge is not directed");
+}
+
+int EdgeModification::get_old_target() const {
+    if (old_type == EdgeType::DIRECTED_TO_X) return x;
+    if (old_type == EdgeType::DIRECTED_TO_Y) return y;
+    throw std::runtime_error("Old edge is not directed");
+}
+
+int EdgeModification::get_old_source() const {
+    if (old_type == EdgeType::DIRECTED_TO_X) return y;
+    if (old_type == EdgeType::DIRECTED_TO_Y) return x;
+    throw std::runtime_error("Old edge is not directed");
+}
+int EdgeModification::get_modification_id() const {
+    if (old_type == EdgeType::NONE && is_new_undirected()) { return 1; }
+    if (old_type == EdgeType::NONE && is_new_directed()) { return 2; }
+    if (is_old_undirected() && new_type == EdgeType::NONE) { return 3; }
+    if (is_old_undirected() && is_new_directed()) { return 4; }
+    if (is_old_directed() && new_type == EdgeType::NONE) { return 5; }
+    if (is_old_directed() && is_new_undirected()) { return 6; }
+    if (is_reverse()) { return 7; }
+    throw std::runtime_error("Invalid modification");
 }
 
 
@@ -130,23 +172,25 @@ std::map<std::pair<int, int>, EdgeModification>::iterator EdgeModificationsMap::
 std::ostream &operator<<(std::ostream &os, const EdgeType &edge_type) {
     switch (edge_type) {
         case EdgeType::DIRECTED_TO_X:
-            os << "DIRECTED_TO_X";
+            os << "←";
             break;
         case EdgeType::DIRECTED_TO_Y:
-            os << "DIRECTED_TO_Y";
+            os << "→";
             break;
         case EdgeType::UNDIRECTED:
-            os << "UNDIRECTED";
+            os << "-";
             break;
         case EdgeType::NONE:
-            os << "NONE";
+            os << " ";
             break;
     }
     return os;
 }
+
 // print function for EdgeModification
 std::ostream &operator<<(std::ostream &os, const EdgeModification &edge_modification) {
-    os << edge_modification.x << " " << edge_modification.y << " "
-       << edge_modification.old_type << " " << edge_modification.new_type;
+    os << edge_modification.x << " " << edge_modification.old_type << " "
+       << edge_modification.y << " becomes " << edge_modification.x << " "
+       << edge_modification.new_type << " " << edge_modification.y;
     return os;
 }
