@@ -7,8 +7,8 @@
 #include <fstream>
 #include <iostream>
 
-#include "cnpy.h"
-#include "dependencies/cxxopts.hpp"
+#include "cnpy/cnpy.h"
+#include "cxxopts.hpp"
 #include "spdlog/spdlog.h"
 #include "spdlog/fmt/ostr.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
