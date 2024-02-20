@@ -1,17 +1,23 @@
 #include "BICScorer.h"
 #include "PDAG.h"
 #include "XGES.h"
+#include "utils.h"
+
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+
+#include "cnpy.h"
+#include "dependencies/cxxopts.hpp"
+#include "spdlog/spdlog.h"
+#include "spdlog/fmt/ostr.h"
+#include "spdlog/sinks/stdout_color_sinks.h"
+
 namespace fs = std::filesystem;
 using namespace std::chrono;
 
-#include "dependencies/cxxopts.hpp"
-
-
-#include "cnpy.h"
-typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> RowMajorMatrixXd;
+typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
+        RowMajorMatrixXd;
 
 template<typename T>
 RowMajorMatrixXd load_npy(const std::string &filename) {
@@ -20,127 +26,102 @@ RowMajorMatrixXd load_npy(const std::string &filename) {
 }
 
 int main(int argc, char *argv[]) {
-    srand(0);// random seed
-
+    srand(0);
     std::cout << std::setprecision(16);
+    // Set up the logger
+    auto logger = spdlog::stdout_color_mt("stdout_logger");
+    logger->set_pattern("[%^%l%$] %v");
 
-    cxxopts::Options options("xges", "Run XGES algorithm on a dataset");
+    // Define the command line options
+    cxxopts::Options options("xges", "Run XGES on given data");
     auto option_adder = options.add_options();
-    option_adder("input", "Input data numpy file", cxxopts::value<std::string>());
+    option_adder("input", "Input data numpy file (must be a contiguous C array)",
+                 cxxopts::value<std::string>());
     option_adder("output", "Output file (default `xges-graph.txt`)",
                  cxxopts::value<std::string>()->default_value("xges-graph.txt"));
-    option_adder("alpha,a", "Alpha parameter", cxxopts::value<double>()->default_value("0.5"));
+    option_adder("alpha,a", "Alpha parameter for the BIC score (default 2.)",
+                 cxxopts::value<double>()->default_value("2."));
     option_adder("stats", "File to save statistics (default `xges-stats.txt`)",
                  cxxopts::value<std::string>()->default_value("xges-stats.txt"));
-    option_adder("interventions",
-                 "If provided, numpy file with intervention applied to each sample (-1 if none)",
-                 cxxopts::value<std::string>()->default_value(""));
-
-    option_adder("t", "threshold delete", cxxopts::value<bool>());
-    option_adder("o", "optimization", cxxopts::value<int>()->default_value("0"));
-
+    option_adder("0,xges0", "Do not perform the extended search of XGES, just XGES-0.",
+                 cxxopts::value<bool>()->default_value("false"));
     option_adder("graph_truth,g", "Graph truth file", cxxopts::value<std::string>());
-
-
+    option_adder("verbose,v", "Level of verbosity (0-3)",
+                 cxxopts::value<int>()->default_value("1"));
     auto args = options.parse(argc, argv);
 
+    if (int verbose_level = args["verbose"].as<int>(); verbose_level == 0) {
+        logger->set_level(spdlog::level::off);
+    } else if (verbose_level == 1) {
+        logger->set_level(spdlog::level::info);
+    } else if (verbose_level == 2) {
+        logger->set_level(spdlog::level::debug);
+    } else if (verbose_level == 3) {
+        logger->set_level(spdlog::level::trace);
+    } else {
+        throw std::runtime_error("Invalid verbose level");
+    }
+
+    // Parse the command line options
     fs::path data_path = args["input"].as<std::string>();
     fs::path output_path = args["output"].as<std::string>();
     double alpha = args["alpha"].as<double>();
 
-    std::cout << "Loading Input: " << data_path << std::endl;
+    logger->info("Loading input: {}", data_path);
     RowMajorMatrixXd m;
     if (data_path.extension() == ".npy") {
         m = load_npy<double>(data_path);
-    } else if (data_path.extension() == ".npz") {
-        cnpy::NpyArray arr = cnpy::npz_load(data_path, "gene_expression");
-        m = Eigen::Map<RowMajorMatrixXd>(arr.data<double>(), arr.shape[0], arr.shape[1]);
     } else {
-        throw std::runtime_error("Unknown file extension");
+        throw std::runtime_error("Input file must be a .npy file");
     }
-    std::cout << "Input shape: " << m.rows() << " " << m.cols() << std::endl;
-    std::cout << "m[0, 0:2] = " << m(0, 0) << " " << m(0, 1) << std::endl;
+    int n_variables = m.cols();
+    int n_samples = m.rows();
+    logger->info("Input loaded. Shape: {} x {}", n_samples, n_variables);
+    logger->debug("m[0, 0:2] = {} {}", m(0, 0), m(0, 1));
 
-    // todo: uniformize how to configure intervention (number, parameters ...)
-    // todo: uniformize num_ and n_
+    logger->info("Computing covariance matrix");
+    auto start_time = high_resolution_clock::now();
+    BICScorer scorer(m, alpha);
+    double elapsed_secs = measure_time(start_time);
+    logger->info("Covariance computed in {} seconds", elapsed_secs);
+    m.resize(0, 0);// free the memory of m
 
-    Eigen::VectorXi m_interventions;
-    std::vector<FlatSet> interventions_candidate_variables;
-    if (args.count("interventions")) {
-        fs::path interventions_path = args["interventions"].as<std::string>();
-        if (interventions_path.extension() == ".npy") {
-            cnpy::NpyArray arr_interventions = cnpy::npy_load(interventions_path);
-            m_interventions = Eigen::Map<Eigen::VectorXi>(arr_interventions.data<int32_t>(),
-                                                          arr_interventions.shape[0]);
-        } else if (interventions_path.extension() == ".npz") {
-            cnpy::NpyArray arr_interventions = cnpy::npz_load(interventions_path, "perturbations");
-            m_interventions = Eigen::Map<Eigen::VectorXi>(arr_interventions.data<int32_t>(),
-                                                          arr_interventions.shape[0]);
-        } else {
-            throw std::runtime_error("Unknown file extension");
-        }
+    XGES xges(n_variables, &scorer);
 
-        // For now assume that intervention i targets variable i
-        for (int i = 0; i < m.cols(); ++i) { interventions_candidate_variables.push_back({i}); }
-    }
-    // fix this by using only one constructor with good defaults
-    std::cout << "Computing covariance" << std::endl;
-    auto start = high_resolution_clock::now();
-    BICScorer scorer =
-            (args.count("interventions") > 0) ? BICScorer(m, m_interventions, alpha) : BICScorer(m, alpha);
-    double elapsed_secs = duration_cast<duration<double>>(high_resolution_clock::now() - start).count();
-
-    std::cout << "Time computing covariance: " << elapsed_secs << std::endl;
-
-    XGES xges = (args.count("interventions") > 0) ? XGES(m, interventions_candidate_variables, &scorer)
-                                                  : XGES(m, &scorer);
-
-    // free the memory of m
-    m.resize(0, 0);
-
-
-    PDAG graph_truth = (args.count("graph_truth") > 0)
-                               ? PDAG::from_file(args["graph_truth"].as<std::string>())
-                               : PDAG(m.cols());
     if (args.count("graph_truth") > 0) {
-        std::cout << "Score truth: " << scorer.score_pdag(graph_truth) << std::endl;
-        xges.ground_truth_pdag = &graph_truth;
-        std::cout << graph_truth << std::endl;
+        std::unique_ptr<PDAG> ground_truth_pdag = std::make_unique<PDAG>(
+                PDAG::from_file(args["graph_truth"].as<std::string>()));
+        xges.ground_truth_pdag = std::move(ground_truth_pdag);
     }
-    // todo: handle it not in this hacky way
-    if (args.count("t")) {
-        xges.deletion_threshold = -1;
-    } else {
-        xges.deletion_threshold = 1e-10;
-    }
-    start = high_resolution_clock::now();
-    xges.fit_heuristic(args["o"].as<int>());
-    elapsed_secs = duration_cast<duration<double>>(high_resolution_clock::now() - start).count();
-    std::cout << "Time searching: " << elapsed_secs << std::endl;
-    std::cout << "Score: " << xges.get_score() << std::endl;
-    std::cout << "Score check: " << scorer.score_pdag(xges.get_pdag()) << std::endl;
-    std::cout << "score_increase, " << xges.get_score() - xges.initial_score << std::endl;
-    std::cout << std::endl;
 
+    bool extended_search = args["0"].as<bool>();
+    logger->info("Fitting XGES with extended search: {}", extended_search);
+    start_time = high_resolution_clock::now();
+    xges.fit_xges(extended_search);
+    elapsed_secs = measure_time(start_time);
 
-    // print all statistics in xges.get_pdag().statistics
-    std::cout << "Statistics: " << std::endl;
-    for (auto &kv: xges.get_pdag().statistics) { std::cout << kv.first << ": " << kv.second << std::endl; }
-    for (auto &kv: xges.statistics) { std::cout << kv.first << ": " << kv.second << std::endl; }
+    logger->info("XGES search completed in {} seconds", elapsed_secs);
+    logger->info("Score: {}", xges.get_score());
 
-    std::cout << xges.get_pdag();
-    // save the pdag in output_path, in the file pdag.txt. create path, adding "/" if needed
-
+    // Save the output
     std::ofstream out_file(output_path);
     out_file << xges.get_pdag().get_adj_string();
     out_file.close();
 
+    // Save the statistics
     std::ofstream stats_file(args["stats"].as<std::string>());
     stats_file << std::setprecision(16);
     stats_file << "time, " << elapsed_secs << std::endl;
     stats_file << "score, " << xges.get_score() << std::endl;
-    stats_file << "score_increase, " << xges.get_score() - xges.initial_score << std::endl;
-    stats_file << "empty_score, " << xges.initial_score << std::endl;
-    for (auto &kv: xges.get_pdag().statistics) { stats_file << kv.first << ", " << kv.second << std::endl; }
+    stats_file << "score check, " << scorer.score_pdag(xges.get_pdag()) << std::endl;
+    stats_file << "score_empty, " << xges.get_initial_score() << std::endl;
+    stats_file << "score_increase, " << xges.get_score() - xges.get_initial_score()
+               << std::endl;
+    for (auto &kv: xges.statistics) {
+        stats_file << kv.first << ", " << kv.second << std::endl;
+    }
+    for (auto &kv: xges.get_pdag().statistics) {
+        stats_file << kv.first << ", " << kv.second << std::endl;
+    }
     return 0;
 }
