@@ -8,11 +8,13 @@
 
 class ScorerInterface {
 public:
+    std::map<std::string, double> statistics;
     virtual ~ScorerInterface() = default;
 
     virtual double local_score(int target, const FlatSet &parents) = 0;
 
     double score_insert(int target, const FlatSet &parents, int parent_to_add) {
+        statistics["score_insert-#calls"]++;
         double score_without_new_parent = local_score(target, parents);
         FlatSet parents_with_new_parent;
         parents_with_new_parent.reserve(parents.size() + 1);
@@ -23,6 +25,8 @@ public:
     }
 
     double score_delete(int target, const FlatSet &parents, int parent_to_remove) {
+        statistics["score_delete-#calls"]++;
+
         double score_with_old_parent = local_score(target, parents);
         FlatSet parents_without_old_parent;
         parents_without_old_parent.reserve(parents.size() - 1);
