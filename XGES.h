@@ -29,7 +29,6 @@ public:
 private:
     int n_variables;
     ScorerInterface *scorer;
-
     PDAG pdag;
     const double initial_score = 0;
     double total_score = 0;
@@ -52,14 +51,15 @@ private:
 
     // todo: make a separate find_inserts_to_y_from_x
     void find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts,
-                           int parent_x = -1, bool positive_only = true);
+                           int parent_x = -1, bool positive_only = true) const;
 
     void find_delete_to_y_from_x(int y, int x, std::vector<Delete> &candidate_deletes,
                                  bool positive_only = true) const;
     void find_deletes_to_y(int y, std::vector<Delete> &candidate_deletes,
                            bool positive_only = true) const;
 
-    void find_reverse_to_y_from_x(int y, int x, std::vector<Reverse> &candidate_reverses);
+    void find_reverse_to_y_from_x(int y, int x,
+                                  std::vector<Reverse> &candidate_reverses) const;
     void find_reverse_to_y(int y, std::vector<Reverse> &candidate_reverses);
     void find_reverse_from_x(int x, std::vector<Reverse> &candidate_reverses);
 };

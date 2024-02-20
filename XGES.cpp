@@ -12,6 +12,12 @@
 
 using namespace std::chrono;
 
+/** @brief Constructor of the XGES class.
+ *
+ * @param n_variables The number of variables in the dataset.
+ * @param scorer The scorer to use to score the PDAGs.
+ *
+ */
 XGES::XGES(const int n_variables, ScorerInterface *scorer)
     : n_variables(n_variables), scorer(scorer), pdag(n_variables),
       initial_score(scorer->score_pdag(pdag)) {
@@ -27,6 +33,11 @@ XGES::XGES(const XGES &other)
 }
 
 
+/** @brief Fit the XGES algorithm using the scorer provided in the constructor.
+ *
+ * @param extended_search If true, the extended search of XGES is performed. Otherwise,
+ * only XGES-0 is performed.
+ */
 void XGES::fit_xges(bool extended_search) {
     std::vector<Insert> candidate_inserts;
     std::vector<Reverse> candidate_reverses;
@@ -43,7 +54,23 @@ void XGES::fit_xges(bool extended_search) {
     if (extended_search) { block_each_edge_and_research(unblocked_paths_map); }
 }
 
-
+/** @brief Extended search of XGES.
+ *
+ * Extended search is performed after XGES-0 has exhausted all possible operators.
+ * It successively delete some edges, and resume the search with XGES-0 (preventing
+ * the deleted edges from being inserted again). If the score increases, the new PDAG
+ * is kept.
+ *
+ * At the beggining of the search, `all_edge_deletes` contains all the possible deletes
+ * for the current PDAG. If the PDAG is updated, we keep iterating through `all_edge_deletes`
+ * until all the deletes have been tried. Only then we recompute `all_edge_deletes` on the
+ * last updated PDAG. Until no new deletes are found. This is more efficient than recomputing
+ * all the deletes at each PDAG update, and re-testing all of them (as most of them will be
+ * the same).
+ *
+ *
+ * @param unblocked_paths_map The unblocked paths map used by XGES-0.
+ */
 void XGES::block_each_edge_and_research(UnblockedPathsMap &unblocked_paths_map) {
     std::vector<Delete> all_edge_deletes;
     bool deletes_of_pdag_are_updated = false;
@@ -98,30 +125,40 @@ void XGES::block_each_edge_and_research(UnblockedPathsMap &unblocked_paths_map) 
     }
 }
 
-
+/** @brief Run the XGES-0 heuristic.
+ *
+ * XGES-0 is the main heuristic of the XGES algorithm. It maintains lists of all possible
+ * operators and apply them in order: delete, reverse, and insert. XGES-0 stops when no
+ * more operators can be applied.
+ * XGES-0 uses update_operator_candidates_efficient to update the operators after each
+ * PDAG update.
+ *
+ * @param candidate_inserts The vector of candidate inserts.
+ * @param candidate_reverses The vector of candidate reverses.
+ * @param candidate_deletes The vector of candidate deletes.
+ * @param unblocked_paths_map The unblocked paths map used by XGES-0.
+ * @param initialize_inserts If true, the candidate inserts are initialized at the beginning
+ * of the heuristic.
+ */
 void XGES::heuristic_xges0(std::vector<Insert> &candidate_inserts,
                            std::vector<Reverse> &candidate_reverses,
                            std::vector<Delete> &candidate_deletes,
                            UnblockedPathsMap &unblocked_paths_map,
                            bool initialize_inserts) {
-
     if (initialize_inserts) {
         // find all possible inserts
         auto start_init_inserts = high_resolution_clock::now();
         for (int y = 0; y < n_variables; ++y) {
             find_inserts_to_y(y, candidate_inserts, -1, true);
         }
-        statistics["time- init_inserts"] +=
-                duration_cast<duration<double>>(high_resolution_clock::now() -
-                                                start_init_inserts)
-                        .count();
+        statistics["initialize_inserts-time"] += measure_time(start_init_inserts);
     }
     EdgeModificationsMap edge_modifications;
     int i_operations = 1;
 
     Insert last_insert(-1, -1, FlatSet{}, -1, FlatSet{});
 
-    // XGES-0 main loop, in order: reverse, delete, insert; one operator per iteration
+    // XGES-0 main loop, in order: delete, reverse, insert; one operator per iteration
     while (!candidate_inserts.empty() || !candidate_reverses.empty() ||
            !candidate_deletes.empty()) {
         edge_modifications.clear();
@@ -212,12 +249,25 @@ void add_pairs(std::set<std::pair<int, int>> &pairs, const FlatSet &xs,
     }
 }
 
+/** @brief Update the candidate operators after a PDAG update.
+ *
+ * After a PDAG update with a set of edge modifications, the candidate operators
+ * are updated following the conditions detailed in the XGES paper. The insert, reverse,
+ * and delete operators are updated according to the type of each edge modification.
+ *
+ * @param edge_modifications The edge modifications that have been applied to the PDAG.
+ * @param candidate_inserts The vector of candidate inserts.
+ * @param candidate_reverses The vector of candidate reverses.
+ * @param candidate_deletes The vector of candidate deletes.
+ * @param unblocked_paths_map The unblocked paths map used by XGES-0.
+ */
 void XGES::update_operator_candidates_efficient(EdgeModificationsMap &edge_modifications,
                                                 std::vector<Insert> &candidate_inserts,
                                                 std::vector<Reverse> &candidate_reverses,
                                                 std::vector<Delete> &candidate_deletes,
                                                 UnblockedPathsMap &unblocked_paths_map) {
 
+    auto start_time = high_resolution_clock::now();
     // First, undo all the edge modifications
     for (auto &[fst, edge_modification]: edge_modifications) {
         pdag.apply_edge_modification(edge_modification, true);
@@ -498,8 +548,6 @@ void XGES::update_operator_candidates_efficient(EdgeModificationsMap &edge_modif
         pdag.apply_edge_modification(edge_modification);
     }
 
-    auto start_time = high_resolution_clock::now();
-
     // Find the inserts
     // step 1: remove partial inserts that are now full
     std::vector<int> keys_to_erase;
@@ -538,28 +586,27 @@ void XGES::update_operator_candidates_efficient(EdgeModificationsMap &edge_modif
             find_reverse_to_y_from_x(y, x, candidate_reverses);
         }
     }
-
-    statistics["time- update_operators"] += measure_time(start_time);
+    statistics["update_operators-time"] += measure_time(start_time);
 }
 
 
 /**
- * Find all possible inserts to y.
+ * @brief Find and score all possible inserts to y.
  *
- * The candidate inserts (x, y, T) are such that:
+ * The candidate  Insert(x, y, T, E) are such that:
  *  1. x is not adjacent to y (x ∉ Ad(y))
  *  2. T ⊆ Ne(y) \ Ad(x)
  *  3. [Ne(y) ∩ Ad(x)] ∪ T is a clique
  *  Not enforced at that stage: [Ne(y) ∩ Ad(x)] ∪ T blocks all semi-directed paths from y to x
+ *  5. E = [Ne(y) ∩ Ad(x)] ∪ T ∪ Pa(y)
  *
- * @param y
- * @param candidate_inserts
- * @param parent_x
- * @param positive_only
+ * @param y The target node.
+ * @param candidate_inserts The vector of candidate inserts to append inserts to.
+ * @param parent_x The parent of y, if known. If -1, no pre-selection is done.
+ * @param positive_only If true, only inserts with a positive score are considered.
  */
-
 void XGES::find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts, int parent_x,
-                             bool positive_only) {
+                             bool positive_only) const {
     auto &adjacent_y = pdag.get_adjacent(y);
     auto &parents_y = pdag.get_parents(y);
 
@@ -611,11 +658,7 @@ void XGES::find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts, int 
             auto &effective_parents = std::get<2>(top);
 
             // change if we parallelize
-            auto start = high_resolution_clock::now();
             double score = scorer->score_insert(y, effective_parents, x);
-            statistics["time- score_insert"] +=
-                    duration_cast<duration<double>>(high_resolution_clock::now() - start)
-                            .count();
             if (score > 0 || !positive_only) {
                 // using move(T)/move(effective_parents) should also work even though we look them up
                 // later. but we play it safe for now.
@@ -646,69 +689,79 @@ void XGES::find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts, int 
     }
 }
 
+/** Find all possible deletes to y from x.
+ *
+ * The candidate deletes (x, y, C, E) are such that:
+ *  1. x is a parent or a neighbor of y
+ *  2. C ⊆ [Ne(y) ∩ Ad(x)]
+ *  3. C is a clique
+ *  4. E = Pa(y) ∪ [Ne(y) ∩ Ad(x)] \ C ∪ {x}
+ *
+ *
+ * @param y The target node.
+ * @param x The source node.
+ * @param candidate_deletes The vector of candidate deletes to append deletes to.
+ * @param positive_only If true, only deletes with a positive score are considered.
+ */
 void XGES::find_delete_to_y_from_x(int y, int x, std::vector<Delete> &candidate_deletes,
                                    bool positive_only) const {
     const FlatSet &parents_y = pdag.get_parents(y);
     auto neighbors_y_adjacent_x = pdag.get_neighbors_adjacent(y, x);
     bool directed_xy = pdag.has_directed_edge(x, y);
 
-    // find all possible O ⊆ [Ne(y) ∩ Ad(x)] that are cliques, quite similar to the inserts but simpler
-    // <O set of nodes, iterator over neighbors_y_adjacent_x, set of effective_parents>
+    // find all possible C ⊆ [Ne(y) ∩ Ad(x)] that are cliques
+    // <C set of nodes, iterator over neighbors_y_adjacent_x, set of effective_parents>
     std::stack<std::tuple<FlatSet, FlatSet::iterator, FlatSet>> stack;
-    // we know that O = {} is valid
     FlatSet effective_parents_init;
     effective_parents_init.reserve(parents_y.size() + neighbors_y_adjacent_x.size() + 1);
     // note: Chickering Corollary 18 is incorrect. Pa(y) might not contain x, it has to be added.
     union_with_single_element(parents_y, x, effective_parents_init);
+    // note that C = {} is valid
     stack.emplace(FlatSet{}, neighbors_y_adjacent_x.begin(), effective_parents_init);
 
     while (!stack.empty()) {
         auto top = std::move(stack.top());
         stack.pop();
-        auto O = std::get<0>(top);
+        auto C = std::get<0>(top);
         auto it = std::get<1>(top);
         auto effective_parents = std::get<2>(top);
 
-        // change if we parallelize
         double score = scorer->score_delete(y, effective_parents, x);
         if (score > 0 || !positive_only) {
-            candidate_deletes.emplace_back(x, y, O, score, effective_parents,
+            candidate_deletes.emplace_back(x, y, C, score, effective_parents,
                                            directed_xy);
             std::push_heap(candidate_deletes.begin(), candidate_deletes.end());
         }
 
-        // Look for other candidate O using the iterator, which gives us the next elements z to consider.
+        // Look for other candidate C using the iterator, which gives us the next elements
+        // z to consider.
         while (it != neighbors_y_adjacent_x.end()) {
-            // We define O' = O ∪ {z} and we check if O' is a clique.
-            // Since O was a clique, we only need to check that z is adjacent to all nodes in O.
+            // We define C' = C ∪ {z} and we check if C' is a clique.
+            // Since C is a clique, we only need to check that z is adjacent to all nodes
+            // in C.
             auto z = *it;
             ++it;
             auto &adjacent_z = pdag.get_adjacent(z);
-            // We check that O ⊆ Ad(z)
-            if (std::ranges::includes(adjacent_z, O)) {
-                // O' is a candidate
-                auto O_prime = O;
-                O_prime.insert(z);
+            // We check C ⊆ Ad(z)
+            if (std::ranges::includes(adjacent_z, C)) {
+                // C' is a candidate
+                auto C_prime = C;
+                C_prime.insert(z);
                 auto effective_parents_prime = effective_parents;
                 effective_parents_prime.insert(z);
-                stack.emplace(std::move(O_prime), it, std::move(effective_parents_prime));
+                stack.emplace(std::move(C_prime), it, std::move(effective_parents_prime));
             }
         }
     }
 }
 
-/** Find all possible deletes to y.
+/** @brief Find all possible deletes to y.
  *
- * The candidate deletes (x, y, H) are such that:
- *  1. x is a parent or a neighbor of y
- *  2. H ⊆ [Ne(y) ∩ Ad(x)]  (alt. O ⊆ [Ne(y) ∩ Ad(x)] -- the complement of H in [Ne(y) ∩ Ad(x)])
- *  3. [Ne(y) ∩ Ad(x)] \ H is a clique (alt. O is a clique)
+ * @see find_delete_to_y_from_x
  *
- *  The effective parents_y are Pa(y) ∪ [Ne(y) ∩ Ad(x)] \ H (alt. Pa(y) ∪ O)
- *
- * @param y
- * @param candidate_deletes
- * @param positive_only
+ * @param y The target node.
+ * @param candidate_deletes The vector of candidate deletes to append deletes to.
+ * @param positive_only If true, only deletes with a positive score are considered.
  */
 void XGES::find_deletes_to_y(const int y, std::vector<Delete> &candidate_deletes,
                              bool positive_only) const {
@@ -724,17 +777,8 @@ void XGES::find_deletes_to_y(const int y, std::vector<Delete> &candidate_deletes
 }
 
 /**
- * Find if I can turn x ← y into x → y.
- * The candidate turn (x, y, T) are such that:
- *  2. T ⊆ Ne(y) \ Ad(x)
- *  3. [Ne(y) ∩ Ad(x)] ∪ T is a clique
- *  Not enforced at that stage: [Ne(y) ∩ Ad(x)] ∪ T blocks all semi-directed paths from y to x (≠ than x ← y)
- *
- * @param y
- * @param candidate_reverses
+ * Only used for the naive update of the operators.
  */
-
-// can i just do insert x -> y?
 void XGES::find_reverse_to_y(int y, std::vector<Reverse> &candidate_reverses) {
     // look for all possible x ← y
     auto &children_y = pdag.get_children(y);
@@ -756,30 +800,24 @@ void XGES::find_reverse_to_y(int y, std::vector<Reverse> &candidate_reverses) {
     }
 }
 
-void XGES::find_reverse_from_x(int x, std::vector<Reverse> &candidate_reverses) {
-    // look for all possible x ← y
-    auto &parents_x = pdag.get_parents(x);
-
-
-    for (int y: parents_x) {
-
-        std::vector<Insert> candidate_inserts;
-        find_inserts_to_y(y, candidate_inserts, x, false);
-
-        for (auto &insert: candidate_inserts) {
-            // change if we parallelize
-            double score = insert.score + scorer->score_delete(x, parents_x, y);
-
-            if (score > 0) {
-                candidate_reverses.emplace_back(insert, score, parents_x);
-                std::push_heap(candidate_reverses.begin(), candidate_reverses.end());
-            }
-        }
-    }
-}
-
+/** @brief Find all possible reverses to y from x.
+ *
+ * @see find_inserts_to_y
+ *
+ * The candidate Reverse(x, y, T, E, F) are such that:
+ * 1. x ← y
+ * 2. T ⊆ Ne(y) \ Ad(x)
+ * 3. [Ne(y) ∩ Ad(x)] ∪ T is a clique
+ * 4. All semi-directed paths from y to x are blocked by [Ne(y) ∩ Ad(x)] ∪ T ∪ Ne(x)
+ * 5. E = [Ne(y) ∩ Ad(x)] ∪ T ∪ Pa(y)
+ * 6. F = Pa(x)
+ *
+ * A reverse is composed of a delete and an insert. The function first finds all possible
+ * inserts to y from x using `find_inserts_to_y` and then evaluate the delete part.
+ *
+ */
 void XGES::find_reverse_to_y_from_x(int y, int x,
-                                    std::vector<Reverse> &candidate_reverses) {
+                                    std::vector<Reverse> &candidate_reverses) const {
     if (!pdag.has_directed_edge(y, x)) { return; }
     std::vector<Insert> candidate_inserts;
     find_inserts_to_y(y, candidate_inserts, x, false);
@@ -795,6 +833,5 @@ void XGES::find_reverse_to_y_from_x(int y, int x,
 
 
 const PDAG &XGES::get_pdag() const { return pdag; }
-
 double XGES::get_score() const { return total_score; }
 double XGES::get_initial_score() const{ return initial_score; }
