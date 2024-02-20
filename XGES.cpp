@@ -83,15 +83,17 @@ void XGES::block_each_edge_and_research(UnblockedPathsMap &unblocked_paths_map) 
                                   candidate_deletes, blocked_paths_map_copy, false);
         if (pdag == xges_copy.pdag) { continue; }
         if (xges_copy.total_score - total_score > 1e-7) {
-            _logger->debug("EXTENDED SEARCH ACCEPTED: {} {}", delete_,
-                           xges_copy.total_score);
+            _logger->debug("EXTENDED SEARCH ACCEPTED: with increase {} and {}",
+                           xges_copy.total_score - total_score, delete_);
             total_score = xges_copy.total_score;
             pdag = xges_copy.pdag;
             unblocked_paths_map = std::move(blocked_paths_map_copy);
             deletes_of_pdag_are_updated = false;
+            statistics["extended_search-accepted"] += 1;
         } else {
             _logger->debug("EXTENDED SEARCH REJECTED: {} {}", delete_,
                            xges_copy.total_score);
+            statistics["extended_search-rejected"] += 1;
         }
     }
 }
@@ -168,16 +170,15 @@ void XGES::heuristic_xges0(std::vector<Insert> &candidate_inserts,
                 continue;
             }
         }
-        // here, we have applied an operator
+        // if we reach this point, we have applied an operator
         i_operations++;
         for (auto &edge_modification: edge_modifications) {
             _logger->trace("\tEdge {}", edge_modification.second);
         }
-        // update the new possible operators
 
+        // update the new possible operators
         // update_operator_candidates_naive(candidate_inserts, candidate_reverses,
         //                                  candidate_deletes);
-
         update_operator_candidates_efficient(edge_modifications, candidate_inserts,
                                              candidate_reverses, candidate_deletes,
                                              unblocked_paths_map);
