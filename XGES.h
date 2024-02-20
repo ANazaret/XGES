@@ -43,18 +43,14 @@ private:
     void update_operator_candidates_naive(std::vector<Insert> &candidate_inserts,
                                           std::vector<Reverse> &candidate_reverses,
                                           std::vector<Delete> &candidate_deletes);
-    void update_operator_candidates(EdgeModificationsMap &edge_modifications,
-                                    std::vector<Insert> &candidate_inserts,
-                                    std::vector<Reverse> &candidate_reverses,
-                                    std::vector<Delete> &candidate_deletes);
-    void update_operator_candidates_v2(EdgeModificationsMap &edge_modifications,
-                                       std::vector<Insert> &candidate_inserts,
-                                       std::vector<Reverse> &candidate_reverses,
-                                       std::vector<Delete> &candidate_deletes,
-                                       UnblockedPathsMap &unblocked_paths_map);
+    void update_operator_candidates_efficient(EdgeModificationsMap &edge_modifications,
+                                              std::vector<Insert> &candidate_inserts,
+                                              std::vector<Reverse> &candidate_reverses,
+                                              std::vector<Delete> &candidate_deletes,
+                                              UnblockedPathsMap &unblocked_paths_map);
     void block_each_edge_and_research(UnblockedPathsMap &unblocked_paths_map);
 
-    // todo: find_inserts_to_y_from_x
+    // todo: make a separate find_inserts_to_y_from_x
     void find_inserts_to_y(int y, std::vector<Insert> &candidate_inserts,
                            int parent_x = -1, bool positive_only = true);
 
