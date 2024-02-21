@@ -119,7 +119,9 @@ class GES(GraphModel):
                           '{SKELETON}': 'FALSE',
                           '{GAPS}': os.sep + 'fixedgaps.csv',
                           '{SCORE}': 'GaussL0penObsScore',
+                          '{ALPHA}': '1.0',  # added
                           '{VERBOSE}': 'FALSE',
+                          '{PHASE}': 'c("forward", "backward", "turning")',  # added
                           '{OUTPUT}': os.sep + 'result.csv'}
         self.verbose = SETTINGS.get_default(verbose=verbose)
         self.score = score
@@ -160,7 +162,7 @@ class GES(GraphModel):
         warnings.warn("GES is ran on the skeleton of the given graph.")
         return self.orient_undirected_graph(data, nx.Graph(graph))
 
-    def create_graph_from_data(self, data, phases=None):
+    def create_graph_from_data(self, data, **kwargs):  # added
         """Run the GES algorithm.
 
         Args:
@@ -174,12 +176,13 @@ class GES(GraphModel):
         self.arguments['{SCORE}'] = self.scores[self.score]
         self.arguments['{VERBOSE}'] = str(self.verbose).upper()
 
-        results = self._run_ges(data, verbose=self.verbose)
+        results = self._run_ges(data, verbose=self.verbose, **kwargs)  # added
 
         return nx.relabel_nodes(nx.DiGraph(results),
                                 {idx: i for idx, i in enumerate(data.columns)})
 
-    def _run_ges(self, data, fixedGaps=None, verbose=True):
+    def _run_ges(self, data, fixedGaps=None, verbose=True, phases=("forward", "backward", "turning"), alpha=1.0):
+        # achille added
         """Setting up and running ges with all arguments."""
         # Run GES
         self.arguments['{FOLDER}'] = Path('{0!s}/cdt_ges_{1!s}/'.format(gettempdir(), uuid.uuid4()))
@@ -196,9 +199,11 @@ class GES(GraphModel):
                 self.arguments['{SKELETON}'] = 'TRUE'
             else:
                 self.arguments['{SKELETON}'] = 'FALSE'
+            self.arguments['{PHASE}'] = "c(" + ", ".join(['"{}"'.format(i) for i in phases]) + ")"  # added
+            self.arguments['{ALPHA}'] = str(alpha)  # added
 
             ges_result = launch_R_script(
-                Path("{}/R_templates/ges.R".format(os.path.dirname(os.path.realpath(__file__)))),
+                Path("{}/ges.R".format(os.path.dirname(os.path.realpath(__file__)))),
                 self.arguments, output_function=retrieve_result, verbose=verbose)
         # Cleanup
         except Exception as e:
