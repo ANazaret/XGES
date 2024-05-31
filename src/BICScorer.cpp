@@ -36,9 +36,11 @@ double log_binomial(const int n, const int k) {
 
 double BICScorer::local_score(int target, const FlatSet &parents) {
     // cache lookup
+    statistics["local_score-#calls-total"]++;
     auto &cache_target = cache[target];
     auto it = cache_target.find(parents);
     if (it != cache_target.end()) { return it->second; }
+    statistics["local_score-#calls-nocache"]++;
 
     // compute score
     // Extracting 'cov_target_target' value
