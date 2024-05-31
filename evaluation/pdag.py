@@ -6,8 +6,9 @@ import networkx as nx
 
 class PDAG:
     """
-    Partial Directed Acyclic Graph (PDAG) class.
-    It is a directed graph that may contain undirected edges.
+    Partial Directed Acyclic Graph (PDAG).
+
+    A directed graph that may contain undirected edges.
     """
 
     def __init__(self, nodes):
@@ -19,30 +20,6 @@ class PDAG:
 
         self.number_of_undirected_edges = 0
         self.number_of_directed_edges = 0
-
-    @staticmethod
-    def EC_SHD(pdag1, pdag2):
-        score = 0
-        # for each pair of nodes (x,y)
-        # we either have: x  y; x -- y; x -> y; x <- y.
-        for x in pdag1.nodes:
-            for y in pdag1.nodes:
-                if x >= y:
-                    continue
-                if pdag1.get_edge_status(x, y) != pdag2.get_edge_status(x, y):
-                    score += 1
-        return score
-
-    @staticmethod
-    def from_digraph(dag):
-        pdag = PDAG(dag.nodes)
-        for x, y in dag.edges:
-            if dag.has_edge(y, x):
-                if not pdag.has_undirected_edge(y, x):
-                    pdag.add_undirected_edge(x, y)
-            else:
-                pdag.add_directed_edge(x, y)
-        return pdag
 
     @property
     def number_of_edges(self):
@@ -163,6 +140,30 @@ class PDAG:
                     shd += 1
         return shd
 
+    @staticmethod
+    def shd_cpdag(pdag1, pdag2):
+        score = 0
+        # for each pair of nodes (x,y)
+        # we either have: x  y; x -- y; x -> y; x <- y.
+        for x in pdag1.nodes:
+            for y in pdag1.nodes:
+                if x >= y:
+                    continue
+                if pdag1.get_edge_status(x, y) != pdag2.get_edge_status(x, y):
+                    score += 1
+        return score
+
+    @staticmethod
+    def from_digraph(dag):
+        pdag = PDAG(dag.nodes)
+        for x, y in dag.edges:
+            if dag.has_edge(y, x):
+                if not pdag.has_undirected_edge(x, y):
+                    pdag.add_undirected_edge(x, y)
+            else:
+                pdag.add_directed_edge(x, y)
+        return pdag
+
 
 def get_dag_edge_status(dag: nx.DiGraph, x, y):
     if dag.has_edge(x, y) and dag.has_edge(y, x):
@@ -234,6 +235,8 @@ def pdag_to_dag(pdag: PDAG):
 def _order_edges(dag: nx.DiGraph) -> list:
     """
     Returns a total ordering of the edges in a DAG.
+
+    Algorithm Order-Edges from [1, Figure 13].
     """
     node_ordering = list(nx.topological_sort(dag))
     node_to_order = {node: i for i, node in enumerate(node_ordering)}
@@ -246,27 +249,14 @@ def _order_edges(dag: nx.DiGraph) -> list:
     return ordered_edges
 
 
-"""
-# 1. Order the edges in G using Algorithm Order-Edges
- 2. Label every edge in G as “unknown”
- 3. While there are edges labeled “unknown” in G
- 4. Let X → Y be the lowest ordered edge that is labeled “unknown”
- 5. For every edge W → X labeled “compelled”
- 6.   If W is not a parent of Y
- 7.     Label X → Y and every edge incident into Y with “compelled”
- 8.     Goto 3
- 9.   Else
-10.    Label W → Y with “compelled”
-11. If there exists an edge Z → Y such that Z ≠ X and Z is not a parent of X
-12.   Label X → Y and all “unknown” edges incident into Y with “compelled”
-13. Else
-14.   Label X → Y and all “unknown” edges incident into Y with “reversible”
-"""
-
-
 def dag_to_cpdag(dag) -> PDAG:
     """
     Returns an essential graph from a DAG.
+    Algorithm Label-Edges from [1, Figure 14].
+
+    References
+    ----------
+    [1] https://www.jmlr.org/papers/volume3/chickering02b/chickering02b.pdf
     """
     ordered_edges = _order_edges(dag)
     pdag = PDAG(dag.nodes)
@@ -291,14 +281,12 @@ def dag_to_cpdag(dag) -> PDAG:
         # if there exists an edge z -> y such that z != x and z is not a parent of x
         if set(dag.predecessors(y)) - {x} - set(dag.predecessors(x)):
             # label x -> y and all edges incident into y as compelled
-            # pdag.directed_graph.add_edge(x, y)
             for z in dag.predecessors(y):
                 if pdag.has_undirected_edge(z, y):
                     continue
                 pdag.add_directed_edge(z, y)
         else:
             # label x -> y and all edges incident into y as reversible
-            # pdag.undirected_graph.add_edge(x, y)
             for z in dag.predecessors(y):
                 if pdag.has_directed_edge(z, y):
                     continue
@@ -307,35 +295,8 @@ def dag_to_cpdag(dag) -> PDAG:
     return pdag
 
 
-def adjacency_to_pdag(adj):
-    n = adj.shape[0]
-    pdag = PDAG(list(range(n)))
-    for i in range(n):
-        for j in range(i):
-            if adj[i, j] != 0 and adj[j, i] != 0:
-                pdag.add_undirected_edge(i, j)
-            elif adj[i, j] != 0:
-                pdag.add_directed_edge(i, j)
-            elif adj[j, i] != 0:
-                pdag.add_directed_edge(j, i)
-    return pdag
-
-
-def compute_ecshd_from_adj(adj1, adj2):
-    cpdag1 = adjacency_to_pdag(adj1).to_cpdag()
-    cpdag2 = adjacency_to_pdag(adj2).to_cpdag()
-
-    return PDAG.EC_SHD(cpdag1, cpdag2)
-
-
-def compute_ecshd_from_graph(graph1, graph2):
+def compute_shd_cpdag(graph1: nx.DiGraph, graph2: nx.DiGraph) -> int:
     cpdag1 = PDAG.from_digraph(graph1).to_cpdag()
     cpdag2 = PDAG.from_digraph(graph2).to_cpdag()
 
-    return PDAG.EC_SHD(cpdag1, cpdag2)
-
-
-def compute_shd_pdag_dag(pdag, dag):
-    if isinstance(pdag, nx.DiGraph):
-        pdag = PDAG.from_digraph(pdag).to_cpdag()
-    return pdag.shd_against_dag(dag)
+    return PDAG.shd_cpdag(cpdag1, cpdag2)
