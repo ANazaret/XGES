@@ -222,6 +222,192 @@ void XGES::heuristic_xges0(std::vector<Insert> &candidate_inserts,
     }
 }
 
+void XGES::fit_ops(bool use_reverse) {
+    std::vector<Insert> candidate_inserts;
+    std::vector<Reverse> candidate_reverses;
+    std::vector<Delete> candidate_deletes;
+    UnblockedPathsMap unblocked_paths_map;
+
+    candidate_inserts.reserve(100 * n_variables);
+    candidate_inserts.reserve(n_variables);
+    candidate_deletes.reserve(n_variables);
+
+    for (int y = 0; y < n_variables; ++y) {
+        find_inserts_to_y(y, candidate_inserts, -1, true);
+    }
+    EdgeModificationsMap edge_modifications;
+    int i_operations = 1;
+
+    Insert last_insert(-1, -1, FlatSet{}, -1, FlatSet{});
+
+    while (!candidate_inserts.empty() || !candidate_reverses.empty() ||
+           !candidate_deletes.empty()) {
+
+        // Look for the operator with the highest score
+        // Each of candidate_inserts, candidate_reverses, candidate_deletes are heaps
+        // with the highest score at the front.
+        double best_score = 0;
+        int best_type = -1;// 0: insert, 1: reverse, 2: delete
+
+        if (!candidate_inserts.empty()) {
+            if (candidate_inserts.front().score > best_score) {
+                best_type = 0;
+                best_score = candidate_inserts.front().score;
+            }
+        }
+        if (!candidate_reverses.empty() && use_reverse) {
+            if (candidate_reverses.front().score > best_score) {
+                best_type = 1;
+                best_score = candidate_reverses.front().score;
+            }
+        }
+        if (!candidate_deletes.empty()) {
+            if (candidate_deletes.front().score > best_score) {
+                best_type = 2;
+                best_score = candidate_deletes.front().score;
+            }
+        }
+
+        edge_modifications.clear();
+        if (best_type == 0) {
+            std::pop_heap(candidate_inserts.begin(), candidate_inserts.end());
+            auto best_insert = std::move(candidate_inserts.back());
+            candidate_inserts.pop_back();
+            if (best_insert.y == last_insert.y &&
+                abs(best_insert.score - last_insert.score) < 1e-10 &&
+                best_insert.x == last_insert.x && best_insert.T == last_insert.T) {
+                statistics["probable_insert_duplicates"] += 1;
+                continue;
+            }
+            last_insert = std::move(best_insert);
+            if (pdag.is_insert_valid(last_insert, unblocked_paths_map)) {
+                pdag.apply_insert(last_insert, edge_modifications);
+                total_score += last_insert.score;
+                _logger->debug("{}: {}", i_operations, last_insert);
+            } else {
+                continue;
+            }
+        } else if (best_type == 1) {
+            // apply the best reverse if possible (no delete available)
+            std::pop_heap(candidate_reverses.begin(), candidate_reverses.end());
+            auto best_reverse = std::move(candidate_reverses.back());
+            candidate_reverses.pop_back();
+            if (pdag.is_reverse_valid(best_reverse, unblocked_paths_map)) {
+                pdag.apply_reverse(best_reverse, edge_modifications);
+                total_score += best_reverse.score;
+                _logger->debug("{}: {}", i_operations, best_reverse);
+            } else {
+                continue;
+            }
+        } else if (best_type == 2) {
+            std::pop_heap(candidate_deletes.begin(), candidate_deletes.end());
+            auto best_delete = std::move(candidate_deletes.back());
+            candidate_deletes.pop_back();
+            if (pdag.is_delete_valid(best_delete)) {
+                pdag.apply_delete(best_delete, edge_modifications);
+                total_score += best_delete.score;
+                _logger->debug("{}: {}", i_operations, best_delete);
+            } else {
+                continue;
+            }
+        } else {
+            continue;
+        }
+
+
+        i_operations++;
+        for (auto &edge_modification: edge_modifications) {
+            _logger->trace("\tEdge {}", edge_modification.second);
+        }
+
+        update_operator_candidates_naive(candidate_inserts, candidate_reverses,
+                                         candidate_deletes);
+
+        if (!use_reverse) { candidate_reverses.clear(); }
+    }
+}
+
+void XGES::fit_ges(bool use_reverse) {
+    std::vector<Insert> candidate_inserts;
+    std::vector<Reverse> candidate_reverses;
+    std::vector<Delete> candidate_deletes;
+    UnblockedPathsMap unblocked_paths_map;
+
+    candidate_inserts.reserve(100 * n_variables);
+    candidate_inserts.reserve(n_variables);
+    candidate_deletes.reserve(n_variables);
+
+
+    EdgeModificationsMap edge_modifications;
+    int i_operations = 1;
+    int last_operation = -1;
+
+    while (i_operations > last_operation) {
+        last_operation = i_operations;
+
+        // only apply inserts
+        for (int y = 0; y < n_variables; ++y) { find_inserts_to_y(y, candidate_inserts); }
+        while (!candidate_inserts.empty()) {
+            edge_modifications.clear();
+            std::pop_heap(candidate_inserts.begin(), candidate_inserts.end());
+            auto best_insert = std::move(candidate_inserts.back());
+            candidate_inserts.pop_back();
+            if (pdag.is_insert_valid(best_insert, unblocked_paths_map)) {
+                pdag.apply_insert(best_insert, edge_modifications);
+                total_score += best_insert.score;
+                _logger->debug("{}: {}", i_operations, best_insert);
+                i_operations++;
+                candidate_inserts.clear();
+                for (int y = 0; y < n_variables; ++y) {
+                    find_inserts_to_y(y, candidate_inserts);
+                }
+            }
+        }
+        // only apply deletes
+        for (int y = 0; y < n_variables; ++y) { find_deletes_to_y(y, candidate_deletes); }
+        while (!candidate_deletes.empty()) {
+            edge_modifications.clear();
+            std::pop_heap(candidate_deletes.begin(), candidate_deletes.end());
+            auto best_delete = std::move(candidate_deletes.back());
+            candidate_deletes.pop_back();
+            if (pdag.is_delete_valid(best_delete)) {
+                pdag.apply_delete(best_delete, edge_modifications);
+                total_score += best_delete.score;
+                _logger->debug("{}: {}", i_operations, best_delete);
+                i_operations++;
+                candidate_deletes.clear();
+                for (int y = 0; y < n_variables; ++y) {
+                    find_deletes_to_y(y, candidate_deletes);
+                }
+            }
+        }
+        // only apply reverses, if use_reverse is true
+        // note that without reverse, there is no multiple
+        // iterations of forward and backward
+        if (!use_reverse) { return; }
+        for (int y = 0; y < n_variables; ++y) {
+            find_reverse_to_y(y, candidate_reverses);
+        }
+        while (!candidate_reverses.empty()) {
+            edge_modifications.clear();
+            std::pop_heap(candidate_reverses.begin(), candidate_reverses.end());
+            auto best_reverse = std::move(candidate_reverses.back());
+            candidate_reverses.pop_back();
+            if (pdag.is_reverse_valid(best_reverse, unblocked_paths_map)) {
+                pdag.apply_reverse(best_reverse, edge_modifications);
+                total_score += best_reverse.score;
+                _logger->debug("{}: {}", i_operations, best_reverse);
+                i_operations++;
+                candidate_reverses.clear();
+                for (int y = 0; y < n_variables; ++y) {
+                    find_reverse_to_y(y, candidate_reverses);
+                }
+            }
+        }
+    }
+}
+
+
 void XGES::update_operator_candidates_naive(std::vector<Insert> &candidate_inserts,
                                             std::vector<Reverse> &candidate_reverses,
                                             std::vector<Delete> &candidate_deletes) {

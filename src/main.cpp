@@ -45,6 +45,8 @@ int main(int argc, char *argv[]) {
                  cxxopts::value<std::string>()->default_value("xges-stats.txt"));
     option_adder("0,xges0", "Do not perform the extended search of XGES, just XGES-0.",
                  cxxopts::value<bool>()->default_value("false"));
+    option_adder("baseline,b", "Run a baseline instead of XGES",
+                 cxxopts::value<std::string>()->default_value(""));
     option_adder("graph_truth,g", "Graph truth file", cxxopts::value<std::string>());
     option_adder("verbose,v", "Level of verbosity (0-3)",
                  cxxopts::value<int>()->default_value("1"));
@@ -61,6 +63,7 @@ int main(int argc, char *argv[]) {
     } else {
         throw std::runtime_error("Invalid verbose level");
     }
+    // logger->set_level(spdlog::level::trace);
 
     // Parse the command line options
     fs::path data_path = args["input"].as<std::string>();
@@ -94,14 +97,30 @@ int main(int argc, char *argv[]) {
         xges.ground_truth_pdag = std::move(ground_truth_pdag);
     }
 
-    bool extended_search = !args["0"].as<bool>();
-    logger->info("Fitting XGES with extended search: {}", extended_search);
-    start_time = high_resolution_clock::now();
-    xges.fit_xges(extended_search);
-    elapsed_secs = measure_time(start_time);
+    if (args.count("baseline") > 0) {
+        std::string baseline = args["baseline"].as<std::string>();
+        if (baseline == "ops") {
+            xges.fit_ops(false);
+        } else if (baseline == "ops-r") {
+            xges.fit_ops(true);
+        } else if (baseline == "ges") {
+            xges.fit_ges(false);
+        } else if (baseline == "ges-r") {
+            xges.fit_ges(true);
+        } else {
+            throw std::runtime_error("Invalid baseline");
+        }
+    } else {
+        bool extended_search = !args["0"].as<bool>();
+        logger->info("Fitting XGES with extended search: {}", extended_search);
+        start_time = high_resolution_clock::now();
+        xges.fit_xges(extended_search);
+        elapsed_secs = measure_time(start_time);
 
-    logger->info("XGES search completed in {} seconds", elapsed_secs);
-    logger->info("Score: {}", xges.get_score());
+        logger->info("XGES search completed in {} seconds", elapsed_secs);
+        logger->info("Score: {}", xges.get_score());
+    }
+
 
     // Save the output
     std::ofstream out_file(output_path);

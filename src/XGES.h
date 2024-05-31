@@ -19,6 +19,8 @@ public:
     XGES(const XGES &other);
 
     void fit_xges(bool extended_search);
+    void fit_ops(bool use_reverse);
+    void fit_ges(bool use_reverse);
     double get_score() const;
     double get_initial_score() const;
     const PDAG &get_pdag() const;
