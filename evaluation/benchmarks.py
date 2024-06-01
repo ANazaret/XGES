@@ -249,7 +249,6 @@ def run_method_given_data(method_name, data, true_graph, **kwargs):
         "xges0": run_xges,
         "xges": run_xges,
         "ops": run_xges,
-        "ops-r": run_xges,
         "b-ges": run_xges,
         "b-ges-r": run_xges,
     }[method_name]
@@ -347,9 +346,7 @@ def main():
     start = time.time()
     res = compare_methods(
         n_jobs=1,
-        # seed=list(range(5)),
-        seed=list(range(0, 30)),
-        # n_control=[1_000_000],
+        seed=list(range(30)),
         n_control=[100, 500, 1000, 5000, 10_000, 50_000, 100_000, 500_000, 1_000_000],
         method_name=[
             "xges0",
@@ -361,7 +358,6 @@ def main():
             "ges+turn",
             "fges",
         ],
-        # d=[10, 25, 50, 100, 200, 300, 500],
         d=[50],
         edges_per_d=[3],
         alpha=[2],
@@ -370,14 +366,12 @@ def main():
     )
     total_time = time.time() - start
     print("total time:", total_time)
-    res.to_csv("benchmark-fig5-v2-n.csv", index=False)
+    res.to_csv("results/benchmark-fig5-v2-n.csv", index=False)
 
     start = time.time()
     res = compare_methods(
         n_jobs=1,
-        # seed=list(range(5)),
-        seed=list(range(0, 30)),
-        # n_control=[1_000_000],
+        seed=list(range(30)),
         n_control=[10_000],
         method_name=[
             "xges0",
@@ -390,7 +384,6 @@ def main():
             "ges+turn",
             "fges",
         ],
-        # d=[10, 25, 50, 100, 200, 300, 500],
         d=[50],
         edges_per_d=[3],
         alpha=[1, 2, 3, 5, 10, 15, 20, 30],
@@ -399,14 +392,13 @@ def main():
     )
     total_time = time.time() - start
     print("total time:", total_time)
-    res.to_csv("benchmark-fig5-v2-alpha.csv", index=False)
+    res.to_csv("results/benchmark-fig5-v2-alpha.csv", index=False)
 
     start = time.time()
     res = compare_methods(
         n_jobs=1,
-        # seed=list(range(5)),
         seed=list(range(30)),
-        n_control=[int(n) for n in np.logspace(2, 7, 30)],
+        n_control=[int(n) for n in np.logspace(2, 8, 30)],
         method_name=[
             "xges0",
             "xges",
@@ -421,7 +413,7 @@ def main():
     )
     total_time = time.time() - start
     print("total time:", total_time)
-    res.to_csv("benchmark-double-descent.csv", index=False)
+    res.to_csv("results/benchmark-double-descent.csv", index=False)
 
     start = time.time()
     res = compare_methods(
@@ -446,16 +438,14 @@ def main():
     )
     total_time = time.time() - start
     print("total time:", total_time)
-    res.to_csv("benchmark-main-fig.csv", index=False)
+    res.to_csv("results/benchmark-main-fig.csv", index=False)
 
     start = time.time()
     res = compare_methods(
         n_jobs=1,
         seed=list(range(10)),
         n_control=[10_000],
-        method_name=[
-            "ges",
-        ],
+        method_name=["ges"],
         d=[10, 50, 100],
         edges_per_d=[1, 2, 3, 4],
         alpha=[2],
@@ -485,7 +475,7 @@ def main():
     )
     total_time = time.time() - start
     print("total time:", total_time)
-    res.to_csv("benchmark-rebuttal-n_bic.csv", index=False)
+    res.to_csv("results/benchmark-rebuttal-n_bic.csv", index=False)
 
     start = time.time()
     res = compare_methods(
@@ -499,8 +489,6 @@ def main():
             "ges+turn",
             "ops",
             "fges",
-            # "b-ges",
-            # "b-ges-r",
         ],
         d=list(np.logspace(1, 2.75, 8).astype(int)),
         edges_per_d=[1, 2, 3, 4],
@@ -510,7 +498,7 @@ def main():
     )
     total_time = time.time() - start
     print("total time:", total_time)
-    res.to_csv("vary-d-and-rho-seeds-1-to-5.csv", index=False)
+    res.to_csv("results/vary-d-and-rho-seeds-1-to-5.csv", index=False)
 
     start = time.time()
     res = compare_methods(
@@ -532,7 +520,7 @@ def main():
     )
     total_time = time.time() - start
     print("total time:", total_time)
-    res.to_csv("benchmark-speed.csv", index=False)
+    res.to_csv("results/benchmark-speed.csv", index=False)
 
 
 if __name__ == '__main__':
