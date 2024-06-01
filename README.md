@@ -5,6 +5,12 @@ This is the code for the paper "Extremely Greedy Equivalence Search".
 We recommend checking any updated code at
 the [official repository](https://github.com/ANazaret/XGES).
 
+## Reproducing the experiments
+
+The experiments can be reproduced by running the `evaluation/benchmarks.py`
+script.
+The figures are generated in the notebook `evaluation/paper.ipynb`.
+
 ## Building the code
 
 Use the CMakeLists.txt file to build the code.
