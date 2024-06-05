@@ -36,35 +36,56 @@ private:
 };
 
 """
+from sortedcontainers import SortedListWithKey
+
+from bic_scorer import BICScorer
 from xges.pdag import PDAG
 from xges.operators import Insert, Delete, Reverse
 
 
 class XGES:
-    def __init__(self, n_variables, scorer):
-        self.n_variables = n_variables
-        self.scorer = scorer
-        self.pdag = PDAG(n_variables)
-        self.initial_score = ...
-        self.total_score = self.initial_score
+    def __init__(self, alpha=2.0):
+        self.alpha = alpha
+        self.n_variables = None
+        self.scorer = None
+        self.pdag = None
+        self.initial_score = None
+        self.total_score = None
         self._logger = None
 
-    def fit(self, X):
-        return self.fit_xges()
+    def _initialize_from_data(self, data):
+        self.n_variables = data.shape[1]
+        self.pdag = PDAG(self.n_variables)
+        self.scorer = BICScorer(data, alpha=self.alpha)
+        # self.initial_score = self.scorer.score_pdag(self.pdag)
+        self.total_score = self.initial_score
+
+    def fit(self, X, extended_search=True):
+        self._initialize_from_data(X)
+        return self.fit_xges(X, extended_search)
 
     def fit_xges(self, X, extended_search=True):
         """
         Fit the XGES algorithm to the data.
         """
-        self._heuristic_xges0(X, initialize_inserts=True)
+        candidate_inserts = SortedListWithKey(key=lambda op: -op.score)
+        candidate_reverses = SortedListWithKey(key=lambda op: -op.score)
+        candidate_deletes = SortedListWithKey(key=lambda op: -op.score)
+
+        self._heuristic_xges0(candidate_inserts, candidate_reverses, candidate_deletes, unblocked_paths_map=None,
+                              initialize_inserts=True)
         if extended_search:
             self._block_each_edge_and_search()
 
-    def _heuristic_xges0(self, candidate_inserts, candidate_reverses, candidate_deletes, unblocked_paths_map,
-                         initialize_inserts):
-        """
-
-        """
+    def _heuristic_xges0(
+            self,
+            candidate_inserts,
+            candidate_reverses,
+            candidate_deletes,
+            unblocked_paths_map,
+            initialize_inserts,
+    ):
+        """ """
         if initialize_inserts:
             # TODO plug the initialization on empty PDAG
             # find all possible inserts
@@ -101,8 +122,12 @@ class XGES:
             elif candidate_inserts:
                 # apply the best insert if possible (no delete or reverse available)
                 best_insert = candidate_inserts.pop()
-                if best_insert.y == last_insert.y and abs(
-                        best_insert.score - last_insert.score) < 1e-10 and best_insert.x == last_insert.x and best_insert.T == last_insert.T:
+                if (
+                        best_insert.y == last_insert.y
+                        and abs(best_insert.score - last_insert.score) < 1e-10
+                        and best_insert.x == last_insert.x
+                        and best_insert.T == last_insert.T
+                ):
                     self.statistics["probable_insert_duplicates"] += 1
                     continue
                 last_insert = best_insert
@@ -121,9 +146,13 @@ class XGES:
             # update the new possible operators
             # self.update_operator_candidates_efficient(edge_modifications, candidate_inserts, candidate_reverses,
             #                                           candidate_deletes, unblocked_paths_map)
-            self.update_operator_candidates_naive(candidate_inserts, candidate_reverses, candidate_deletes)
+            self.update_operator_candidates_naive(
+                candidate_inserts, candidate_reverses, candidate_deletes
+            )
 
-    def update_operator_candidates_naive(self, candidate_inserts, candidate_reverses, candidate_deletes):
+    def update_operator_candidates_naive(
+            self, candidate_inserts, candidate_reverses, candidate_deletes
+    ):
         candidate_inserts.clear()
         candidate_reverses.clear()
         candidate_deletes.clear()
