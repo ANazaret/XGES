@@ -553,3 +553,81 @@ class PDAG:
                 dag_tmp.remove_directed_edge(parent, x)
             nodes_tmp.remove(x)
         return dag_extension
+
+    def to_networkx(self):
+        """
+        Convert the PDAG to a networkx DiGraph object, where the PDAG undirected edges are
+        represented using two directed edges in opposite directions.
+        Call `get_dag_extension().to_networkx()` to get a networkx DiGraph object representing one
+        of the DAG in the Markov equivalence class of the PDAG.
+
+        Returns
+        -------
+        nx.DiGraph
+            The networkx DiGraph object representing the PDAG.
+
+        See Also
+        --------
+        get_dag_extension : Get a DAG in the Markov equivalence class of the PDAG.
+        """
+        import networkx as nx
+
+        G = nx.DiGraph()
+        for x in range(self.num_nodes):
+            G.add_node(x)
+        for x in range(self.num_nodes):
+            for y in self.children[x]:
+                G.add_edge(x, y)
+        for x in range(self.num_nodes):
+            for y in self.neighbors[x]:
+                G.add_edge(x, y)
+        return G
+
+    def to_adjacency_matrix(self):
+        """
+        Convert the PDAG to an adjacency matrix.
+
+        A directed edge (x, y) is represented by a 1 in cell (x, y) and a 0 in cell (y, x).
+        An undirected edge {x, y} is represented by a 1 in cell (x, y) and a 1 in cell (y, x).
+        Other cells are 0.
+
+        Call `get_dag_extension().to_adjacency_matrix()` to get the adjacency matrix of a DAG
+        in the Markov equivalence class of the PDAG.
+
+        Returns
+        -------
+        numpy.ndarray
+            The adjacency matrix of the PDAG.
+
+        See Also
+        --------
+        get_dag_extension : Get a DAG in the Markov equivalence class of the PDAG.
+        """
+        adjacency_matrix = np.zeros((self.num_nodes, self.num_nodes))
+        for x in range(self.num_nodes):
+            for y in self.children[x]:
+                adjacency_matrix[x, y] = 1
+        for x in range(self.num_nodes):
+            for y in self.neighbors[x]:
+                adjacency_matrix[x, y] = 1
+                adjacency_matrix[y, x] = 1
+        return adjacency_matrix
+
+    def __str__(self):
+        undirected_edges_str = ", ".join(
+            f"{x} - {y}"
+            for x in range(self.num_nodes)
+            for y in self.neighbors[x]
+            if x < y
+        )
+        directed_edges_str = ", ".join(
+            f"{x} → {y}" for x in range(self.num_nodes) for y in self.children[x]
+        )
+        return (
+            f"PDAG: "
+            f"undirected edges = {{{undirected_edges_str}}}, "
+            f"directed edges = {{{directed_edges_str}}}"
+        )
+
+    def __repr__(self):
+        return str(self)

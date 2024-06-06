@@ -93,6 +93,13 @@ class XGES:
         """
         return copy.deepcopy(self.pdag)
 
+    def get_a_dag(self) -> "nx.DiGraph":
+        """
+        Get one of the DAGs in the Markov equivalence class of the graph, as a networkx DiGraph.
+        """
+        dag_extension = self.pdag.get_dag_extension()
+        return dag_extension.to_directed_graph()
+
     def _initialize_from_data(
             self,
             data: np.array,
