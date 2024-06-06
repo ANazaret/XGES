@@ -5,7 +5,7 @@ for learning the structure of a causal graph from observational data.
 It improves upon the Greedy Equivalence Search (GES) algorithm with a
 more accurate search strategy and a more efficient implementation.
 
-The algorithm is described in the paper "Extremely Greedy Equivalence Search" (see below).
+The algorithm is described in the paper "Extremely Greedy Equivalence Search" (see [citation below](#Citation))
 
 In this repo, we provide:
 
@@ -72,7 +72,7 @@ during the execution of the algorithm.
 
 More options can be found by running `xges --help`.
 
-## Citing
+## Citation
 
 If you use this code, please cite the following paper:
 
