@@ -46,11 +46,13 @@ class BICScorer(ScorerInterface):
             cov_parents_target = self.covariance_matrix[np.ix_(parents, [target])]
 
             beta = np.linalg.solve(cov_parents_parents, cov_parents_target)
-            sigma = cov_target_target - np.dot(cov_parents_target.T, beta)
+            sigma = cov_target_target - np.dot(cov_parents_target.T, beta).item()
 
+        if sigma <= 0:
+            print("Negative sigma")
         log_likelihood_no_constant = -0.5 * self.n_samples * (1 + np.log(sigma))
 
-        bic_regularization = 0.5 * np.log(self.n_samples) * (len(parents) + 1.) * self.alpha
+        bic_regularization = 0.5 * np.log(self.n_samples) * (len(parents) + 1.0) * self.alpha
 
         bic = log_likelihood_no_constant - bic_regularization
 

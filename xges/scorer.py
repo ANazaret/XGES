@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from time import time
 
+import numpy as np
+
 
 class ScorerInterface(ABC):
     def __init__(self):
@@ -10,6 +12,18 @@ class ScorerInterface(ABC):
     @abstractmethod
     def local_score(self, target, parents):
         pass
+
+    def score_all_pairs(self):
+        scores = np.zeros((self.n_variables, self.n_variables))
+        for i in range(self.n_variables):
+            for j in range(self.n_variables):
+                if i == j:
+                    continue
+                # i to j is the same as j to i
+                parents = {i}
+                scores[i, j] = self.local_score(j, parents) - self.local_score(j, set())
+
+        return scores
 
     def score_insert(self, target, parents, parent_to_add):
         self.statistics["score_insert-#calls"] += 1
@@ -37,6 +51,6 @@ class ScorerInterface(ABC):
         score = 0
         dag = pdag.get_dag_extension()
         # compute the score at nodes that are variables
-        for target in dag.get_nodes_variables():
+        for target in dag.get_nodes():
             score += self.local_score(target, dag.get_parents(target))
         return score
