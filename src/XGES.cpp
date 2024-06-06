@@ -80,6 +80,7 @@ void XGES::block_each_edge_and_research(UnblockedPathsMap &unblocked_paths_map) 
             for (const int y: pdag.get_nodes_variables()) {
                 find_deletes_to_y(y, all_edge_deletes, false);
             }
+            if (all_edge_deletes.empty()) { break; }
             deletes_of_pdag_are_updated = true;
         }
         // get delete from the heap
