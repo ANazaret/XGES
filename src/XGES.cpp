@@ -74,19 +74,18 @@ void XGES::fit_xges(bool extended_search) {
 void XGES::block_each_edge_and_research(UnblockedPathsMap &unblocked_paths_map) {
     std::vector<Delete> all_edge_deletes;
     bool deletes_of_pdag_are_updated = false;
-    int index = 0;
 
-    while (index < all_edge_deletes.size() || !deletes_of_pdag_are_updated) {
-        if (index >= all_edge_deletes.size()) {
-            all_edge_deletes.clear();
+    while (!all_edge_deletes.empty() || !deletes_of_pdag_are_updated) {
+        if (all_edge_deletes.empty()) {
             for (const int y: pdag.get_nodes_variables()) {
                 find_deletes_to_y(y, all_edge_deletes, false);
             }
             deletes_of_pdag_are_updated = true;
-            index = 0;
         }
-
-        auto delete_ = all_edge_deletes[index++];
+        // get delete from the heap
+        std::pop_heap(all_edge_deletes.begin(), all_edge_deletes.end());
+        auto delete_ = std::move(all_edge_deletes.back());
+        all_edge_deletes.pop_back();
         if (!pdag.is_delete_valid(delete_)) { continue; }
         // Apply the delete
         XGES xges_copy(*this);
