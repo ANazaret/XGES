@@ -82,6 +82,17 @@ class XGES:
         self._initialize_from_data(X, use_fast_numba=use_fast_numba, scorer=scorer)
         return self.fit_xges(extended_search)
 
+    def get_pdag(self):
+        """
+        Get the PDAG object representing the Markov equivalence class of the graph.
+
+        Returns
+        -------
+        PDAG
+            The PDAG object.
+        """
+        return copy.deepcopy(self.pdag)
+
     def _initialize_from_data(
             self, data: np.array, use_fast_numba: bool = True, scorer: ScorerInterface = None
     ):
@@ -236,16 +247,16 @@ class XGES:
         deletes_of_pdag_are_updated = False
         index = 0
 
-        while index < len(all_edge_deletes) or not deletes_of_pdag_are_updated:
+        while len(all_edge_deletes) or not deletes_of_pdag_are_updated:
             if index >= len(all_edge_deletes):
                 all_edge_deletes.clear()
                 for y in self.pdag.get_nodes():
                     self._find_deletes_to_y(y, all_edge_deletes, False)
+                if len(all_edge_deletes) == 0:
+                    break
                 deletes_of_pdag_are_updated = True
-                index = 0
 
-            delete_ = all_edge_deletes[index]
-            index += 1
+            delete_ = all_edge_deletes.pop(0)
             if not self.pdag.is_delete_valid(delete_):
                 continue
             # Apply the Delete
