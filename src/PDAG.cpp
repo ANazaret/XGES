@@ -331,7 +331,7 @@ bool PDAG::is_insert_valid(const Insert &insert, UnblockedPathsMap &unblocked_pa
     if (reverse) {
         // for reverse: ne_y_ad_x_T is actually [Ne(y) ∩ Ad(x)] ∪ T ∪ Ne(x)
         ne_y_ad_x_T.insert(neighbors.at(x).begin(), neighbors.at(x).end());
-    };
+    }
     if (!is_blocking_semi_directed_paths(y, x, ne_y_ad_x_T, unblocked_paths_map,
                                          ignore_direct_edge)) {
         statistics["is_insert_valid-false_4-#"] += 1;
@@ -838,13 +838,11 @@ std::string PDAG::get_adj_string() const {
     }
     result += "\n";
     // other line: adjacency matrix (0,1)
-    for (int node: nodes_variables) {
+    for (const int node: nodes_variables) {
         std::string line;
-        for (int node2: nodes_variables) {
-            if (node == node2) {
-                line += "0, ";
-            } else if (has_undirected_edge(node, node2) ||
-                       has_directed_edge(node, node2)) {
+        for (const int node2: nodes_variables) {
+            if (has_undirected_edge(node, node2) || has_directed_edge(node, node2)) {
+                if (node == node2) { throw std::runtime_error("Self-loop detected"); }
                 line += "1, ";
             } else {
                 line += "0, ";

@@ -261,10 +261,7 @@ void XGES::fit_ops(bool use_reverse) {
             }
         }
         if (!candidate_deletes.empty()) {
-            if (candidate_deletes.front().score > best_score) {
-                best_type = 2;
-                best_score = candidate_deletes.front().score;
-            }
+            if (candidate_deletes.front().score > best_score) { best_type = 2; }
         }
 
         edge_modifications.clear();
@@ -407,9 +404,9 @@ void XGES::fit_ges(bool use_reverse) {
 }
 
 
-void XGES::update_operator_candidates_naive(std::vector<Insert> &candidate_inserts,
-                                            std::vector<Reverse> &candidate_reverses,
-                                            std::vector<Delete> &candidate_deletes) {
+void XGES::update_operator_candidates_naive(
+        std::vector<Insert> &candidate_inserts, std::vector<Reverse> &candidate_reverses,
+        std::vector<Delete> &candidate_deletes) const {
     candidate_inserts.clear();
     candidate_reverses.clear();
     candidate_deletes.clear();
@@ -588,28 +585,10 @@ void XGES::update_operator_candidates_efficient(EdgeModificationsMap &edge_modif
         }
         // Track deletes
         FlatSet x_intersection;
-        FlatSet y_intersection;
         switch (edge_modification.get_modification_id()) {
             case 1:// a  b becomes a -- b
                 full_delete_to_y.insert(a);
-                full_delete_to_y.insert(b);
-                full_delete_from_x.insert(a);
-                full_delete_from_x.insert(b);
-
-                // x \in  Ad(a) ∩ Ad(b) and y \in Ne(a) ∩ Ne(b) [almost never happens]
-                std::ranges::set_intersection(
-                        pdag.get_adjacent(a), pdag.get_adjacent(b),
-                        std::inserter(x_intersection, x_intersection.begin()));
-                if (!x_intersection.empty()) {
-                    std::ranges::set_intersection(
-                            pdag.get_neighbors(a), pdag.get_neighbors(b),
-                            std::inserter(y_intersection, y_intersection.begin()));
-                    add_pairs(delete_x_y, x_intersection, y_intersection);
-                }
-
-                break;
             case 2:// a  b becomes a → b
-                // TODO: merge (appropriately) with case 1
                 full_delete_to_y.insert(b);
                 full_delete_from_x.insert(a);
                 full_delete_from_x.insert(b);
@@ -618,6 +597,7 @@ void XGES::update_operator_candidates_efficient(EdgeModificationsMap &edge_modif
                         pdag.get_adjacent(a), pdag.get_adjacent(b),
                         std::inserter(x_intersection, x_intersection.begin()));
                 if (!x_intersection.empty()) {
+                    FlatSet y_intersection;
                     std::ranges::set_intersection(
                             pdag.get_neighbors(a), pdag.get_neighbors(b),
                             std::inserter(y_intersection, y_intersection.begin()));
@@ -642,15 +622,6 @@ void XGES::update_operator_candidates_efficient(EdgeModificationsMap &edge_modif
             case 1:// a  b becomes a -- b
                 // y \in {a, b}
                 full_reverse_to_y.insert(a);
-                full_reverse_to_y.insert(b);
-                //y \in Ne(a) ∩ Ne(b)
-                std::ranges::set_intersection(
-                        pdag.get_neighbors(a), pdag.get_neighbors(b),
-                        std::inserter(full_reverse_to_y, full_reverse_to_y.begin()));
-                // x \in {a, b}
-                full_reverse_from_x.insert(a);
-                full_reverse_from_x.insert(b);
-                break;
             case 2:// a  b becomes a → b
                 // y = b
                 full_reverse_to_y.insert(b);
@@ -736,12 +707,12 @@ void XGES::update_operator_candidates_efficient(EdgeModificationsMap &edge_modif
     // Find the inserts
     // step 1: remove partial inserts that are now full
     std::vector<int> keys_to_erase;
-    for (auto [y, xs]: partial_insert_to_y) {
+    for (const auto &[y, xs]: partial_insert_to_y) {
         if (full_insert_to_y.contains(y)) { keys_to_erase.push_back(y); }
     }
     for (auto key: keys_to_erase) { partial_insert_to_y.erase(key); }
     // step 2: find the partial inserts
-    for (auto [y, xs]: partial_insert_to_y) {
+    for (const auto &[y, xs]: partial_insert_to_y) {
         for (auto x: xs) {
             // check that x is not adjacent to y
             if (!pdag.get_adjacent(y).contains(x) && x != y) {
@@ -967,7 +938,7 @@ void XGES::find_deletes_to_y(const int y, std::vector<Delete> &candidate_deletes
 /**
  * Only used for the naive update of the operators.
  */
-void XGES::find_reverse_to_y(int y, std::vector<Reverse> &candidate_reverses) {
+void XGES::find_reverse_to_y(int y, std::vector<Reverse> &candidate_reverses) const {
     // look for all possible x ← y
     auto &children_y = pdag.get_children(y);
 
