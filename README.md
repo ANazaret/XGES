@@ -1,24 +1,61 @@
 # Extremely Greedy Equivalence Search
 
-This is the code for the paper "Extremely Greedy Equivalence Search".
+Extremely Greedy Equivalence Search (XGES) is an efficient algorithm
+for learning the structure of a causal graph from observational data.
+It improves upon the Greedy Equivalence Search (GES) algorithm with a
+more accurate search strategy and a more efficient implementation.
 
-We recommend checking any updated code at
-the [official repository](https://github.com/ANazaret/XGES).
+The algorithm is described in the paper "Extremely Greedy Equivalence Search" (see below).
+
+In this repo, we provide:
+
+- a pure python implementation of the algorithm in `xges/` available with `pip install xges`.
+    - it can optionally use `numba` for faster execution.
+    - examples of usage are available in `examples/simple.py`.
+- a pure c++ implementation of the algorithm in `src-cpp/`, which is at least ~10x faster
+  than the python implementation (with `numba`).
+- code to reproduce the experiments in the paper in `evaluation/`.
+    - an ad-hoc python wrapper calling the cpp executable is available in `evaluation/benchmarks.py`.
+    - a notebook to generate the figures in the paper in `evaluation/paper.ipynb`.
+
+## Using the python package
+
+The python package can be installed with pip:
+
+```bash
+pip install xges
+```
+
+The package can be used as follows:
+
+```python
+data = ...
+xges = XGES()
+pdag = xges.fit(data)  # PDAG object representing the Markov equivalence class (MEC)
+
+# PDAG object with only directed edges, representing an arbitrary DAG in the MEC
+a_dag = pdag.get_dag_extension()
+
+# networkx DiGraph object with two edges for undirected PDAG edges
+networkx_pdag = pdag.to_networkx()
+networkx_dag = a_dag.to_networkx()
+
+adjacency_pdag = pdag.to_adjacency_matrix()
+adjacency_dag = a_dag.to_adjacency_matrix()
+
+
+
+```
 
 ## Reproducing the experiments
 
 The experiments can be reproduced by running the `evaluation/benchmarks.py`
-script.
+script (after compiling the c++ code in `src-cpp`).
 The figures are generated in the notebook `evaluation/paper.ipynb`.
 
-## Building the code
+## Building the c++ code
 
 Use the CMakeLists.txt file to build the code.
-
-## Running the code
-
-We recommend checking the simple Python wrapper `evaluation/benchmarks.py` to
-see how to call the `xges` executable.
 
 The code can be run with the following command:
 

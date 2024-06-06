@@ -59,7 +59,7 @@ class XGES:
         extended_search: bool = True,
         use_fast_numba: bool = True,
         scorer: ScorerInterface = None,
-    ):
+    ) -> PDAG:
         """
         Fit the XGES algorithm to the data.
 
@@ -77,7 +77,8 @@ class XGES:
 
         Returns
         -------
-        TODO
+        PDAG:
+            The PDAG object representing the Markov equivalence class of the graph.
         """
         self._initialize_from_data(X, use_fast_numba=use_fast_numba, scorer=scorer)
         return self.fit_xges(extended_search)
@@ -147,7 +148,7 @@ class XGES:
         self.total_score = self.initial_score
         self.statistics = defaultdict(int)
 
-    def fit_xges(self, extended_search: bool = True):
+    def fit_xges(self, extended_search: bool = True) -> PDAG:
         """
         Fit the XGES (or XGES-0) algorithm to the data.
 
@@ -172,6 +173,8 @@ class XGES:
             self._block_each_edge_and_search(unblocked_paths_map)
 
         self._logger.info(f"Final score: {self.total_score}")
+
+        return self.get_pdag()
 
     def _heuristic_xges0(
         self,
