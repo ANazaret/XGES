@@ -25,7 +25,7 @@ def score_all_pairs(cov, n, alpha=1.0):
     """
     diag_sqrt = np.sqrt(np.diag(cov))
     corr = cov / np.outer(diag_sqrt, diag_sqrt)
-    scores = -0.5 * n * np.log(1 - corr ** 2) - 0.5 * np.log(n) * alpha
+    scores = -0.5 * n * np.log(1 - corr**2) - 0.5 * np.log(n) * alpha
     return scores
 
 
@@ -51,7 +51,7 @@ def numba_ix(arr, rows, cols):
     one_d_index = np.zeros(len(rows) * len(cols), dtype=np.int32)
     for i, r in enumerate(rows):
         start = i * len(cols)
-        one_d_index[start: start + len(cols)] = cols + arr.shape[1] * r
+        one_d_index[start : start + len(cols)] = cols + arr.shape[1] * r
 
     arr_1d = arr.reshape((arr.shape[0] * arr.shape[1], 1))
     slice_1d = np.take(arr_1d, one_d_index)
@@ -108,7 +108,9 @@ class BICScorerFast(ScorerInterface):
         return log_n_choose_k
 
     def score_all_pairs(self):
-        self.cache_score_all_pairs = score_all_pairs(self.covariance_matrix, self.n_samples, self.alpha)
+        self.cache_score_all_pairs = score_all_pairs(
+            self.covariance_matrix, self.n_samples, self.alpha
+        )
         return self.cache_score_all_pairs
 
     def local_score(self, target, parents):
@@ -119,7 +121,9 @@ class BICScorerFast(ScorerInterface):
             return self.cache[target][cache_key]
         self.statistics["local_score-#calls-nocache"] += 1
 
-        bic = local_bic_fast(target, np.array(parents, dtype=int), self.n_samples, self.covariance_matrix, self.alpha)
+        bic = local_bic_fast(
+            target, np.array(parents, dtype=int), self.n_samples, self.covariance_matrix, self.alpha
+        )
 
         self.cache[target][cache_key] = bic
 

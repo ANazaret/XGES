@@ -104,9 +104,8 @@ class EdgeModification:
 
     def is_reverse(self):
         return (
-                (self.old_type == EdgeType.DIRECTED_TO_X and self.new_type == EdgeType.DIRECTED_TO_Y) or
-                (self.old_type == EdgeType.DIRECTED_TO_Y and self.new_type == EdgeType.DIRECTED_TO_X)
-        )
+            self.old_type == EdgeType.DIRECTED_TO_X and self.new_type == EdgeType.DIRECTED_TO_Y
+        ) or (self.old_type == EdgeType.DIRECTED_TO_Y and self.new_type == EdgeType.DIRECTED_TO_X)
 
     def is_new_directed(self):
         return self.new_type == EdgeType.DIRECTED_TO_X or self.new_type == EdgeType.DIRECTED_TO_Y
@@ -149,25 +148,27 @@ class EdgeModification:
         raise RuntimeError("Edge is not directed")
 
     def get_modification_id(self):
-        if (self.old_type == EdgeType.NONE and self.is_new_undirected()):
+        if self.old_type == EdgeType.NONE and self.is_new_undirected():
             return 1
-        if (self.old_type == EdgeType.NONE and self.is_new_directed()):
+        if self.old_type == EdgeType.NONE and self.is_new_directed():
             return 2
-        if (self.is_old_undirected() and self.new_type == EdgeType.NONE):
+        if self.is_old_undirected() and self.new_type == EdgeType.NONE:
             return 3
-        if (self.is_old_undirected() and self.is_new_directed()):
+        if self.is_old_undirected() and self.is_new_directed():
             return 4
-        if (self.is_old_directed() and self.new_type == EdgeType.NONE):
+        if self.is_old_directed() and self.new_type == EdgeType.NONE:
             return 5
-        if (self.is_old_directed() and self.is_new_undirected()):
+        if self.is_old_directed() and self.is_new_undirected():
             return 6
         if self.is_reverse():
             return 7
         raise RuntimeError("Invalid modification")
 
     def __repr__(self):
-        return (f"{self.x} {EdgeType.to_string(self.old_type)} {self.y} "
-                f"becomes {self.x} {EdgeType.to_string(self.new_type)} {self.y}")
+        return (
+            f"{self.x} {EdgeType.to_string(self.old_type)} {self.y} "
+            f"becomes {self.x} {EdgeType.to_string(self.new_type)} {self.y}"
+        )
 
 
 class EdgeModificationsMap:
