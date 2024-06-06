@@ -7,15 +7,13 @@
 
 #include "set_ops.h"
 #include <iostream>
-#include <set>
 
 class Reverse;
 
 
 class Insert {
 public:
-    Insert(int x, int y, const FlatSet &T, double score,
-           const FlatSet &effective_parents);
+    Insert(int x, int y, FlatSet T, double score, FlatSet effective_parents);
 
     friend std::ostream &operator<<(std::ostream &os, const Insert &obj);
     friend std::ostream &operator<<(std::ostream &os, const Reverse &obj);
@@ -30,13 +28,13 @@ public:
 private:
     int x, y;
     FlatSet T;
-    FlatSet effective_parents;// = [Ne(y) ∩ Ad(x)] ∪ T ∪ Pa(y)
     double score = 0;
+    FlatSet effective_parents;// = [Ne(y) ∩ Ad(x)] ∪ T ∪ Pa(y)
 };
 
 class Delete {
 public:
-    Delete(int x, int y, const FlatSet &O, double score, const FlatSet &effective_parents,
+    Delete(int x, int y, FlatSet C, double score, FlatSet effective_parents,
            bool directed);
 
     friend std::ostream &operator<<(std::ostream &os, const Delete &obj);
@@ -50,18 +48,18 @@ public:
 
 private:
     int x, y;
-    bool directed;
     FlatSet C;
-    FlatSet effective_parents;// O ∪ Pa(y)
     double score = 0;
+    FlatSet effective_parents;// C ∪ Pa(y)
+    bool directed;
 };
 
 
 class Reverse {
 public:
     Reverse(int x, int y, const FlatSet &T, double score,
-            const FlatSet &effective_parents, const FlatSet &parents_x);
-    Reverse(Insert insert, double score, const FlatSet &parents_x);
+            const FlatSet &effective_parents, FlatSet parents_x);
+    Reverse(Insert insert, double score, FlatSet parents_x);
 
     friend std::ostream &operator<<(std::ostream &os, const Reverse &obj);
 

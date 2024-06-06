@@ -5,4 +5,4 @@ set(CMAKE_CXX_STANDARD 23)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib)
 add_subdirectory(lib)
-add_subdirectory(src)
+add_subdirectory(src-cpp)

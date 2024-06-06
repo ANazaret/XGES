@@ -16,7 +16,7 @@ private:
 
 public:
     explicit CircularBuffer(const int max_size)
-        : buffer(std::unique_ptr<T[]>(new T[max_size])), max_size(max_size){};
+        : buffer(std::unique_ptr<T[]>(new T[max_size])), max_size(max_size) {}
 
     // copy assignment
     CircularBuffer &operator=(const CircularBuffer<T> &other) {
@@ -68,8 +68,7 @@ public:
 
     int size() const {
         if (front_idx <= back_idx) return back_idx - front_idx;
-        else
-            return max_size + back_idx - front_idx;
+        return max_size + back_idx - front_idx;
     }
 
     void clear() {

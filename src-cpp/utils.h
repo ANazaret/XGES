@@ -14,13 +14,11 @@ measure_time(const std::chrono::high_resolution_clock::time_point start_time) {
 }
 
 // define hash function for pairs of ints
-namespace std {
-    template<>
-    struct hash<std::pair<int, int>> {
-        size_t operator()(const std::pair<int, int> &p) const noexcept {
-            size_t h1 = std::hash<int>()(p.first);
-            h1 ^= std::hash<int>()(p.second) + 0x9e3779b9 + (h1 << 6) + (h1 >> 2);
-            return h1;
-        }
-    };
-}// namespace std
+template<>
+struct std::hash<std::pair<int, int>> {
+    size_t operator()(const std::pair<int, int> &p) const noexcept {
+        size_t h1 = std::hash<int>()(p.first);
+        h1 ^= std::hash<int>()(p.second) + 0x9e3779b9 + (h1 << 6) + (h1 >> 2);
+        return h1;
+    }
+};// namespace std

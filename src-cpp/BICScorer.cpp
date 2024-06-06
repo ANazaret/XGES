@@ -2,20 +2,19 @@
 // Created by Achille Nazaret on 11/7/23.
 //
 #include "BICScorer.h"
-#include <iostream>
 
 MatrixXd compute_covariance(const MatrixXd &data) {
     const long n_samples = data.rows();
 
     const MatrixXd centered = data.rowwise() - data.colwise().mean();
-    MatrixXd covariance_matrix = (centered.adjoint() * centered) / n_samples;
+    MatrixXd covariance_matrix = centered.adjoint() * centered / n_samples;
     return covariance_matrix;
 }
 
 MatrixXd compute_covariance(const MatrixXd &data, const VectorXi &interventions_index) {
     const long n_samples = data.rows();
-    MatrixXd centered = data.rowwise() - data.colwise().mean();
-    MatrixXd covariance_matrix = (centered.adjoint() * centered) / n_samples;
+    const MatrixXd centered = data.rowwise() - data.colwise().mean();
+    MatrixXd covariance_matrix = centered.adjoint() * centered / n_samples;
     return covariance_matrix;
 }
 
@@ -29,8 +28,7 @@ BICScorer::BICScorer(const MatrixXd &data, double alpha)
 double log_binomial(const int n, const int k) {
     // by definition: log(n choose k) = log(n!) - log(k!) - log((n-k)!)
     // and log-gamma(n+1) = log(n!)
-    double log_n_choose_k = lgamma(n + 1) - lgamma(k + 1) - lgamma(n - k + 1);
-    return log_n_choose_k;
+    return lgamma(n + 1) - lgamma(k + 1) - lgamma(n - k + 1);
 }
 
 

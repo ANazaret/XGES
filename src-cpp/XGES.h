@@ -43,7 +43,7 @@ private:
                          bool initialize_inserts = true);
     void update_operator_candidates_naive(std::vector<Insert> &candidate_inserts,
                                           std::vector<Reverse> &candidate_reverses,
-                                          std::vector<Delete> &candidate_deletes);
+                                          std::vector<Delete> &candidate_deletes) const;
     void update_operator_candidates_efficient(EdgeModificationsMap &edge_modifications,
                                               std::vector<Insert> &candidate_inserts,
                                               std::vector<Reverse> &candidate_reverses,
@@ -62,6 +62,6 @@ private:
 
     void find_reverse_to_y_from_x(int y, int x,
                                   std::vector<Reverse> &candidate_reverses) const;
-    void find_reverse_to_y(int y, std::vector<Reverse> &candidate_reverses);
+    void find_reverse_to_y(int y, std::vector<Reverse> &candidate_reverses) const;
     void find_reverse_from_x(int x, std::vector<Reverse> &candidate_reverses);
 };
