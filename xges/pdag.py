@@ -198,7 +198,7 @@ class PDAG:
             # for reverse: ne_y_ad_x_T is actually [Ne(y) ∩ Ad(x)] ∪ T ∪ Ne(x)
             ne_y_ad_x_T = ne_y_ad_x_T.union(self.neighbors[x])
         if not self.is_blocking_semi_directed_paths(
-                y, x, ne_y_ad_x_T, unblocked_paths_map, ignore_direct_edge
+            y, x, ne_y_ad_x_T, unblocked_paths_map, ignore_direct_edge
         ):
             self.statistics["is_insert_valid-false_4-#"] += 1
             self.statistics["is_insert_valid-false-time"] += time.time() - start_time
@@ -214,10 +214,10 @@ class PDAG:
             return False
         return self.is_insert_valid(reverse.insert, unblocked_paths_map, True)
 
-    def is_delete_valid(self, delet):
+    def is_delete_valid(self, delete):
         # 1. x and y are neighbors or x is a parent of y [aka y is adjacent_reachable from x]
-        x = delet.x
-        y = delet.y
+        x = delete.x
+        y = delete.y
         if y not in self.adjacent_reachable[x]:
             return False
 
@@ -225,15 +225,15 @@ class PDAG:
         # <=> C ⊆ Ne(y) and C ⊆ Ad(x)
         neighbors_y = self.neighbors[y]
         adjacent_x = self.adjacent[x]
-        if not (delet.C.issubset(neighbors_y) and delet.C.issubset(adjacent_x)):
+        if not (delete.C.issubset(neighbors_y) and delete.C.issubset(adjacent_x)):
             return False
 
-        # 3. E (delet.effective_parents) = C ∪ Pa(y) ∪ {x}
-        if delet.effective_parents != delet.C.union(self.parents[y]).union({x}):
+        # 3. E (delete.effective_parents) = C ∪ Pa(y) ∪ {x}
+        if delete.effective_parents != delete.C.union(self.parents[y]).union({x}):
             return False
 
         # 4. C is a clique
-        if not self.is_clique(delet.C):
+        if not self.is_clique(delete.C):
             return False
 
         return True
@@ -242,7 +242,7 @@ class PDAG:
         return x in self.forbidden_insert_parents[y]
 
     def is_blocking_semi_directed_paths(
-            self, y, x, blocked_nodes, unblocked_paths_map, ignore_direct_edge
+        self, y, x, blocked_nodes, unblocked_paths_map, ignore_direct_edge
     ):
         if y == x:
             return False
@@ -273,7 +273,9 @@ class PDAG:
                 self.block_semi_directed_path_parent[n] = node
                 if n == x:
                     self.statistics["block_semi_directed_paths-false-#"] += 1
-                    self.statistics["block_semi_directed_paths-false-time"] += time.time() - start_time
+                    self.statistics["block_semi_directed_paths-false-time"] += (
+                        time.time() - start_time
+                    )
                     # retrieve the path
                     current = x
                     while current != y:
@@ -425,10 +427,10 @@ class PDAG:
                 x = edge.get_source()
                 y = edge.get_target()
                 if not (
-                        self.is_part_of_v_structure(x, y)
-                        or self.is_oriented_by_meek_rule_1(x, y)
-                        or self.is_oriented_by_meek_rule_2(x, y)
-                        or self.is_oriented_by_meek_rule_3(x, y)
+                    self.is_part_of_v_structure(x, y)
+                    or self.is_oriented_by_meek_rule_1(x, y)
+                    or self.is_oriented_by_meek_rule_2(x, y)
+                    or self.is_oriented_by_meek_rule_3(x, y)
                 ):
                     self.remove_directed_edge(x, y)
                     self.add_undirected_edge(x, y)
@@ -438,15 +440,15 @@ class PDAG:
                 x = edge.get_x()
                 y = edge.get_y()
                 if (
-                        self.is_oriented_by_meek_rule_1(x, y)
-                        or self.is_oriented_by_meek_rule_2(x, y)
-                        or self.is_oriented_by_meek_rule_3(x, y)
+                    self.is_oriented_by_meek_rule_1(x, y)
+                    or self.is_oriented_by_meek_rule_2(x, y)
+                    or self.is_oriented_by_meek_rule_3(x, y)
                 ):
                     pass
                 elif (
-                        self.is_oriented_by_meek_rule_1(y, x)
-                        or self.is_oriented_by_meek_rule_2(y, x)
-                        or self.is_oriented_by_meek_rule_3(y, x)
+                    self.is_oriented_by_meek_rule_1(y, x)
+                    or self.is_oriented_by_meek_rule_2(y, x)
+                    or self.is_oriented_by_meek_rule_3(y, x)
                 ):
                     x, y = y, x
                 else:
@@ -461,25 +463,25 @@ class PDAG:
         for x in self.nodes:
             for y in self.children[x]:
                 if not (
-                        self.is_part_of_v_structure(x, y)
-                        or self.is_oriented_by_meek_rule_1(x, y)
-                        or self.is_oriented_by_meek_rule_2(x, y)
-                        or self.is_oriented_by_meek_rule_3(x, y)
+                    self.is_part_of_v_structure(x, y)
+                    or self.is_oriented_by_meek_rule_1(x, y)
+                    or self.is_oriented_by_meek_rule_2(x, y)
+                    or self.is_oriented_by_meek_rule_3(x, y)
                 ):
                     return False
             for y in self.neighbors[x]:
                 if (
-                        self.is_part_of_v_structure(x, y)
-                        or self.is_oriented_by_meek_rule_1(x, y)
-                        or self.is_oriented_by_meek_rule_2(x, y)
-                        or self.is_oriented_by_meek_rule_3(x, y)
+                    self.is_part_of_v_structure(x, y)
+                    or self.is_oriented_by_meek_rule_1(x, y)
+                    or self.is_oriented_by_meek_rule_2(x, y)
+                    or self.is_oriented_by_meek_rule_3(x, y)
                 ):
                     return False
                 if (
-                        self.is_part_of_v_structure(y, x)
-                        or self.is_oriented_by_meek_rule_1(y, x)
-                        or self.is_oriented_by_meek_rule_2(y, x)
-                        or self.is_oriented_by_meek_rule_3(y, x)
+                    self.is_part_of_v_structure(y, x)
+                    or self.is_oriented_by_meek_rule_1(y, x)
+                    or self.is_oriented_by_meek_rule_2(y, x)
+                    or self.is_oriented_by_meek_rule_3(y, x)
                 ):
                     return False
         return True
