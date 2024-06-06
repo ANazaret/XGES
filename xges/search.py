@@ -1,22 +1,48 @@
-"""
-"""
 import copy
 import logging
 import time
 from collections import defaultdict
-from typing import Dict, List, Tuple, Set
+from typing import Dict, Tuple, Set
 
+import numpy as np
 from sortedcontainers import SortedListWithKey
 
 from bic_scorer import BICScorer
 from bic_scorer_fast import BICScorerFast
-from edge_queue_set import EdgeModificationsMap, EdgeModification
+from edge_queue_set import EdgeModificationsMap
+from scorer import ScorerInterface
 from xges.pdag import PDAG
 from xges.operators import Insert, Delete, Reverse
 
+UnblockedPathsMap = Dict[Tuple[int, int], Set[Tuple[int, int]]]
+
 
 class XGES:
-    def __init__(self, alpha=2.0):
+    """
+    The Extremely Greedy Equivalence Search algorithm for structure learning.
+
+    Parameters
+    ----------
+    alpha: float (default=2.0)
+        The penalty term for the BIC score.
+
+    Attributes
+    ----------
+    alpha: float
+        The penalty term for the BIC score.
+    n_variables: int
+        The number of variables in the data.
+    scorer: Scorer
+        The scorer used to evaluate the local scores. Default is BICScorerFast.
+    pdag: PDAG
+        The PDAG object representing the Markov equivalence class of the graph.
+    initial_score: float
+        The score of the empty graph.
+    total_score: float
+        The score of the current (final) graph.
+    """
+
+    def __init__(self, alpha: float = 2.0):
         self.alpha = alpha
         self.n_variables = None
         self.scorer = None
@@ -28,10 +54,47 @@ class XGES:
         logger = logging.getLogger()
         self._logger = logger
 
-    def _initialize_from_data(self, data, use_fast_numba=True):
+    def fit(
+            self,
+            X: np.ndarray,
+            extended_search: bool = True,
+            use_fast_numba: bool = True,
+            scorer: ScorerInterface = None,
+    ):
+        """
+        Fit the XGES algorithm to the data.
+
+        Parameters
+        ----------
+        X: np.ndarray
+            The data matrix, where rows are samples and columns are variables.
+        extended_search: bool (default=True)
+            Whether to perform the extended search (XGES) or not (XGES-0).
+        use_fast_numba: bool
+            Whether to use the fast Numba implementation of the BIC scorer. Ignored if scorer is provided.
+        scorer: ScorerInterface
+            The scorer object to use. If None, the BIC scorer is used.
+
+        Returns
+        -------
+        TODO
+        """
+        self._initialize_from_data(X, use_fast_numba=use_fast_numba, scorer=scorer)
+        return self.fit_xges(extended_search)
+
+    def _initialize_from_data(
+            self, data: np.array, use_fast_numba: bool = True, scorer: ScorerInterface = None
+    ):
+        """
+        Initialize the XGES class from the data.
+
+        See fit() for the parameters.
+        """
         self.n_variables = data.shape[1]
         self.pdag = PDAG(self.n_variables)
-        if use_fast_numba:
+        if scorer is not None:
+            self.scorer = scorer
+        elif use_fast_numba:
             self.scorer = BICScorerFast(data, alpha=self.alpha)
         else:
             self.scorer = BICScorer(data, alpha=self.alpha)
@@ -39,13 +102,14 @@ class XGES:
         self.total_score = self.initial_score
         self.statistics = defaultdict(int)
 
-    def fit(self, X, extended_search=True, use_fast_numba=True):
-        self._initialize_from_data(X, use_fast_numba=use_fast_numba)
-        return self.fit_xges(X, extended_search)
-
-    def fit_xges(self, X, extended_search=True):
+    def fit_xges(self, extended_search: bool = True):
         """
-        Fit the XGES algorithm to the data.
+        Fit the XGES (or XGES-0) algorithm to the data.
+
+        Parameters
+        ----------
+        extended_search: bool (default=True)
+            Whether to perform the extended search (XGES) or not (XGES-0).
         """
         candidate_inserts = SortedListWithKey(key=lambda op: -op.score)
         candidate_reverses = SortedListWithKey(key=lambda op: -op.score)
@@ -66,20 +130,36 @@ class XGES:
 
     def _heuristic_xges0(
             self,
-            candidate_inserts,
-            candidate_reverses,
-            candidate_deletes,
-            unblocked_paths_map,
-            initialize_inserts,
+            candidate_inserts: SortedListWithKey,
+            candidate_reverses: SortedListWithKey,
+            candidate_deletes: SortedListWithKey,
+            unblocked_paths_map: UnblockedPathsMap,
+            initialize_inserts: bool,
     ):
-        """ """
+        """
+        The XGES-0 algorithm.
+
+        Parameters
+        ----------
+        candidate_inserts: SortedListWithKey
+            The list of candidate inserts (usually empty at the beginning).
+        candidate_reverses: SortedListWithKey
+            The list of candidate reverses (usually empty at the beginning).
+        candidate_deletes: SortedListWithKey
+            The list of candidate deletes (usually empty at the beginning).
+        unblocked_paths_map: UnblockedPathsMap
+            The map of unblocked paths where the key is a tuple (x, y) and the value is a set of tuples (x, y) representing one
+            unblocked path found from x to y.
+        initialize_inserts: bool
+            Whether to initialize the inserts or not. If True, the candidate_inserts list is filled with the possible inserts.
+        """
         if initialize_inserts:
             if self.pdag.is_empty():
-                self.find_inserts_on_empty_graph(candidate_inserts)
+                self._find_inserts_on_empty_graph(candidate_inserts)
             else:
                 # find all possible inserts
                 for y in range(self.n_variables):
-                    self.find_inserts_to_y(y, candidate_inserts, None, True)
+                    self._find_inserts_to_y(y, candidate_inserts, None, True)
         edge_modifications = EdgeModificationsMap()
         i_operations = 1
 
@@ -133,15 +213,25 @@ class XGES:
                 self._logger.log(5, f"Edge modification: {edge_modification}")
 
             # update the new possible operators
-            self.update_operator_candidates_efficient(edge_modifications, candidate_inserts, candidate_reverses,
-                                                      candidate_deletes, unblocked_paths_map)
+            self._update_operator_candidates_efficient(
+                edge_modifications,
+                candidate_inserts,
+                candidate_reverses,
+                candidate_deletes,
+                unblocked_paths_map,
+            )
 
-            # print score is correct
-            # self.update_operator_candidates_naive(
-            #     candidate_inserts, candidate_reverses, candidate_deletes
-            # )
+    def _block_each_edge_and_search(self, unblocked_paths_map: UnblockedPathsMap):
+        """
+        Perform the extended search of the XGES algorithm.
 
-    def _block_each_edge_and_search(self, unblocked_paths_map):
+        It applies each deletion and re-apply XGES-0 on the graph with the deletion enforced.
+
+        Parameters
+        ----------
+        unblocked_paths_map: UnblockedPathsMap
+            The map of unblocked paths obtained from the previous XGES-0 run.
+        """
         all_edge_deletes = SortedListWithKey(key=lambda op: -op.score)
         deletes_of_pdag_are_updated = False
         index = 0
@@ -150,7 +240,7 @@ class XGES:
             if index >= len(all_edge_deletes):
                 all_edge_deletes.clear()
                 for y in self.pdag.get_nodes():
-                    self.find_deletes_to_y(y, all_edge_deletes, False)
+                    self._find_deletes_to_y(y, all_edge_deletes, False)
                 deletes_of_pdag_are_updated = True
                 index = 0
 
@@ -158,7 +248,7 @@ class XGES:
             index += 1
             if not self.pdag.is_delete_valid(delete_):
                 continue
-            # Apply the delete
+            # Apply the Delete
             xges_copy = copy.deepcopy(self)
             edge_modifications = EdgeModificationsMap()
             candidate_inserts = SortedListWithKey(key=lambda op: -op.score)
@@ -172,43 +262,76 @@ class XGES:
             for snd in edge_modifications:
                 self._logger.log(5, "\tEdge {}".format(snd))
 
-            xges_copy.update_operator_candidates_efficient(
-                edge_modifications, candidate_inserts, candidate_reverses,
-                candidate_deletes, blocked_paths_map_copy)
-            xges_copy._heuristic_xges0(candidate_inserts, candidate_reverses,
-                                       candidate_deletes, blocked_paths_map_copy, False)
+            xges_copy._update_operator_candidates_efficient(
+                edge_modifications,
+                candidate_inserts,
+                candidate_reverses,
+                candidate_deletes,
+                blocked_paths_map_copy,
+            )
+            xges_copy._heuristic_xges0(
+                candidate_inserts,
+                candidate_reverses,
+                candidate_deletes,
+                blocked_paths_map_copy,
+                initialize_inserts=False,
+            )
             if self.pdag == xges_copy.pdag:
                 continue
             if xges_copy.total_score - self.total_score > 1e-7:
-                self._logger.debug("EXTENDED SEARCH ACCEPTED: with increase {} and {}".format(
-                    xges_copy.total_score - self.total_score, delete_))
+                self._logger.debug(
+                    "EXTENDED SEARCH ACCEPTED: with increase {} and {}".format(
+                        xges_copy.total_score - self.total_score, delete_
+                    )
+                )
                 self.total_score = xges_copy.total_score
                 self.pdag = xges_copy.pdag
                 unblocked_paths_map = blocked_paths_map_copy
                 deletes_of_pdag_are_updated = False
                 self.statistics["extended_search-accepted"] += 1
             else:
-                self._logger.debug("EXTENDED SEARCH REJECTED: {} {}".format(delete_, xges_copy.total_score))
+                self._logger.debug(
+                    "EXTENDED SEARCH REJECTED: {} {}".format(delete_, xges_copy.total_score)
+                )
                 self.statistics["extended_search-rejected"] += 1
 
-    def update_operator_candidates_naive(
-            self, candidate_inserts, candidate_reverses, candidate_deletes
+    def _update_operator_candidates_naive(
+            self, candidate_inserts: SortedListWithKey, candidate_reverses: SortedListWithKey,
+            candidate_deletes: SortedListWithKey
     ):
+        """
+        Update the candidate operators of all variables. This is the naive implementation used by GES.
+
+        XGES uses a more efficient implementation in `_update_operator_candidates_efficient`.
+
+        Parameters
+        ----------
+        candidate_inserts: SortedListWithKey
+            The list of candidate inserts, which will be updated.
+        candidate_reverses: SortedListWithKey
+            The list of candidate reverses, which will be updated.
+        candidate_deletes: SortedListWithKey
+            The list of candidate deletes, which will be updated.
+
+         See Also
+        --------
+        _update_operator_candidates_efficient
+        """
         candidate_inserts.clear()
         candidate_reverses.clear()
         candidate_deletes.clear()
         for y in range(self.n_variables):
-            self.find_inserts_to_y(y, candidate_inserts)
-            self.find_reverse_to_y(y, candidate_reverses)
-            self.find_deletes_to_y(y, candidate_deletes)
+            self._find_inserts_to_y(y, candidate_inserts)
+            self._find_reverse_to_y(y, candidate_reverses)
+            self._find_deletes_to_y(y, candidate_deletes)
 
-    def update_operator_candidates_efficient(
+    def _update_operator_candidates_efficient(
             self,
             edge_modifications: EdgeModificationsMap,
             candidate_inserts,
             candidate_reverses,
             candidate_deletes,
-            unblocked_paths_map: Dict[Tuple[int, int], Set[Tuple[int, int]]]
+            unblocked_paths_map: Dict[Tuple[int, int], Set[Tuple[int, int]]],
     ):
         start_time = time.time()
 
@@ -418,12 +541,12 @@ class XGES:
             for x in xs:
                 if x not in self.pdag.get_adjacent(y) and x != y:
                     # self._logger.debug(f"Partial insert: x={x}, y={y}")
-                    self.find_inserts_to_y(y, candidate_inserts, x)
+                    self._find_inserts_to_y(y, candidate_inserts, x)
 
         # Step 3: find the full inserts
         for y in full_insert_to_y:
             # self._logger.debug(f"Full insert: y={y}")
-            self.find_inserts_to_y(y, candidate_inserts)
+            self._find_inserts_to_y(y, candidate_inserts)
 
         # Find the deletes
         # Step 1: form the edges to delete
@@ -437,7 +560,7 @@ class XGES:
         # Step 2: find the deletes
         for x, y in delete_x_y:
             if x != y:
-                self.find_delete_to_y_from_x(y, x, candidate_deletes)
+                self._find_delete_to_y_from_x(y, x, candidate_deletes)
 
         # Find the reverses
         # Step 1: form the edges to reverse
@@ -450,11 +573,11 @@ class XGES:
         for x, y in reverse_x_y:
             # check that x ← y
             if self.pdag.has_directed_edge(y, x) and x != y:
-                self.find_reverse_to_y_from_x(y, x, candidate_reverses)
+                self._find_reverse_to_y_from_x(y, x, candidate_reverses)
 
         self.statistics["update_operators-time"] += time.time() - start_time
 
-    def find_inserts_to_y(self, y, candidate_inserts, parent_x=None, positive_only=True):
+    def _find_inserts_to_y(self, y, candidate_inserts, parent_x=None, positive_only=True):
         adjacent_y = self.pdag.get_adjacent(y)
         parents_y = self.pdag.get_parents(y)
 
@@ -499,7 +622,7 @@ class XGES:
                         effective_parents_prime.add(z)
                         stack.append((T_prime, idx + i + 1, effective_parents_prime))
 
-    def find_delete_to_y_from_x(self, y, x, candidate_deletes, positive_only=True):
+    def _find_delete_to_y_from_x(self, y, x, candidate_deletes, positive_only=True):
         parents_y = self.pdag.get_parents(y)
         neighbors_y_adjacent_x = list(self.pdag.get_neighbors_adjacent(y, x))
         directed_xy = self.pdag.has_directed_edge(x, y)
@@ -522,42 +645,42 @@ class XGES:
                     effective_parents_prime.add(z)
                     stack.append((C_prime, idx + 1 + i, effective_parents_prime))
 
-    def find_deletes_to_y(self, y, candidate_deletes, positive_only=True):
+    def _find_deletes_to_y(self, y, candidate_deletes, positive_only=True):
         neighbors_y = self.pdag.get_neighbors(y)
         parents_y = self.pdag.get_parents(y)
 
         for x in parents_y:
-            self.find_delete_to_y_from_x(y, x, candidate_deletes, positive_only)
+            self._find_delete_to_y_from_x(y, x, candidate_deletes, positive_only)
 
         for x in neighbors_y:
-            self.find_delete_to_y_from_x(y, x, candidate_deletes, positive_only)
+            self._find_delete_to_y_from_x(y, x, candidate_deletes, positive_only)
 
-    def find_reverse_to_y(self, y, candidate_reverses):
+    def _find_reverse_to_y(self, y, candidate_reverses):
         # look for all possible x ← y
         children_y = self.pdag.get_children(y)
 
         for x in children_y:
             parents_x = self.pdag.get_parents(x)
             candidate_inserts = set()
-            self.find_inserts_to_y(y, candidate_inserts, x, False)
+            self._find_inserts_to_y(y, candidate_inserts, x, False)
 
             for insert in candidate_inserts:
                 score = insert.score + self.scorer.score_delete(x, parents_x, y)
                 if score > 0:
                     candidate_reverses.add(Reverse(insert, score, parents_x.copy()))
 
-    def find_reverse_to_y_from_x(self, y, x, candidate_reverses):
+    def _find_reverse_to_y_from_x(self, y, x, candidate_reverses):
         if not self.pdag.has_directed_edge(y, x):
             return
         candidate_inserts = set()
-        self.find_inserts_to_y(y, candidate_inserts, x, False)
+        self._find_inserts_to_y(y, candidate_inserts, x, False)
         parents_x = self.pdag.get_parents(x)
         for insert in candidate_inserts:
             score = insert.score + self.scorer.score_delete(x, parents_x, y)
             if score > 0:
                 candidate_reverses.add(Reverse(insert, score, parents_x.copy()))
 
-    def find_inserts_on_empty_graph(self, candidate_inserts):
+    def _find_inserts_on_empty_graph(self, candidate_inserts):
         paired_scores = self.scorer.score_all_pairs()
         for x in range(self.n_variables):
             for y in range(self.n_variables):
