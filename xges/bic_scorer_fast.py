@@ -1,9 +1,10 @@
-import numpy as np
-from scipy.special import gammaln
 from collections import defaultdict
-from xges.scorer import ScorerInterface
 
 import numba as nb
+import numpy as np
+from scipy.special import gammaln
+
+from xges.scorer import ScorerInterface
 
 
 @nb.jit(

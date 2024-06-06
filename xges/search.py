@@ -2,16 +2,16 @@ import copy
 import logging
 import time
 from collections import defaultdict
-from typing import Dict, Tuple, Set
+from typing import Dict, Set, Tuple
 
 import numpy as np
 from sortedcontainers import SortedListWithKey
 
 from xges.bic_scorer import BICScorer
 from xges.edge_queue_set import EdgeModificationsMap
-from xges.scorer import ScorerInterface
+from xges.operators import Delete, Insert, Reverse
 from xges.pdag import PDAG
-from xges.operators import Insert, Delete, Reverse
+from xges.scorer import ScorerInterface
 
 UnblockedPathsMap = Dict[Tuple[int, int], Set[Tuple[int, int]]]
 
@@ -290,9 +290,9 @@ class XGES:
             xges_copy.total_score += delete_.score
             xges_copy.pdag.add_forbidden_insert(delete_.x, delete_.y)
             blocked_paths_map_copy = copy.deepcopy(unblocked_paths_map)
-            self._logger.debug("EXTENDED SEARCH: {}".format(delete_))
+            self._logger.debug(f"EXTENDED SEARCH: {delete_}")
             for snd in edge_modifications:
-                self._logger.log(5, "\tEdge {}".format(snd))
+                self._logger.log(5, f"\tEdge {snd}")
 
             xges_copy._update_operator_candidates_efficient(
                 edge_modifications,
@@ -312,9 +312,7 @@ class XGES:
                 continue
             if xges_copy.total_score - self.total_score > 1e-7:
                 self._logger.debug(
-                    "EXTENDED SEARCH ACCEPTED: with increase {} and {}".format(
-                        xges_copy.total_score - self.total_score, delete_
-                    )
+                    f"EXTENDED SEARCH ACCEPTED: with increase {xges_copy.total_score - self.total_score} and {delete_}"
                 )
                 self.total_score = xges_copy.total_score
                 self.pdag = xges_copy.pdag
@@ -323,9 +321,7 @@ class XGES:
                 self.statistics["extended_search-accepted"] += 1
             else:
                 self._logger.debug(
-                    "EXTENDED SEARCH REJECTED: {} {}".format(
-                        delete_, xges_copy.total_score
-                    )
+                    f"EXTENDED SEARCH REJECTED: {delete_} {xges_copy.total_score}"
                 )
                 self.statistics["extended_search-rejected"] += 1
 
