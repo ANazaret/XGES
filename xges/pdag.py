@@ -483,7 +483,7 @@ class PDAG:
                 self.add_directed_edge(x, y)
                 edge_modifications_map.update_edge_directed(x, y, EdgeType.UNDIRECTED)
                 self.add_adjacent_edges(x, y, edges_to_check)
-        assert self.check_is_cpdag()
+        assert self.check_is_cpdag(), "This should not happen! Report a bug please."
 
     def check_is_cpdag(self):
         for x in self.nodes:
