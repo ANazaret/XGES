@@ -114,6 +114,9 @@ class PDAG:
         self.adjacent_reachable[y].add(x)
         self.number_of_undirected_edges += 1
 
+    def add_forbidden_insert(self, x, y):
+        self.forbidden_insert_parents[y].add(x)
+
     def apply_edge_modification(self, edge_modification, undo=False):
         old_type = edge_modification.old_type
         new_type = edge_modification.new_type

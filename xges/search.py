@@ -1,5 +1,6 @@
 """
 """
+import copy
 import logging
 import time
 from collections import defaultdict
@@ -59,7 +60,7 @@ class XGES:
             initialize_inserts=True,
         )
         if extended_search:
-            self._block_each_edge_and_search()
+            self._block_each_edge_and_search(unblocked_paths_map)
 
         self._logger.info(f"Final score: {self.total_score}")
 
@@ -140,6 +141,56 @@ class XGES:
             #     candidate_inserts, candidate_reverses, candidate_deletes
             # )
 
+    def _block_each_edge_and_search(self, unblocked_paths_map):
+        all_edge_deletes = SortedListWithKey(key=lambda op: -op.score)
+        deletes_of_pdag_are_updated = False
+        index = 0
+
+        while index < len(all_edge_deletes) or not deletes_of_pdag_are_updated:
+            if index >= len(all_edge_deletes):
+                all_edge_deletes.clear()
+                for y in self.pdag.get_nodes():
+                    self.find_deletes_to_y(y, all_edge_deletes, False)
+                deletes_of_pdag_are_updated = True
+                index = 0
+
+            delete_ = all_edge_deletes[index]
+            index += 1
+            if not self.pdag.is_delete_valid(delete_):
+                continue
+            # Apply the delete
+            xges_copy = copy.deepcopy(self)
+            edge_modifications = EdgeModificationsMap()
+            candidate_inserts = SortedListWithKey(key=lambda op: -op.score)
+            candidate_reverses = SortedListWithKey(key=lambda op: -op.score)
+            candidate_deletes = SortedListWithKey(key=lambda op: -op.score)
+            xges_copy.pdag.apply_delete(delete_, edge_modifications)
+            xges_copy.total_score += delete_.score
+            xges_copy.pdag.add_forbidden_insert(delete_.x, delete_.y)
+            blocked_paths_map_copy = copy.deepcopy(unblocked_paths_map)
+            self._logger.debug("EXTENDED SEARCH: {}".format(delete_))
+            for snd in edge_modifications:
+                self._logger.log(5, "\tEdge {}".format(snd))
+
+            xges_copy.update_operator_candidates_efficient(
+                edge_modifications, candidate_inserts, candidate_reverses,
+                candidate_deletes, blocked_paths_map_copy)
+            xges_copy._heuristic_xges0(candidate_inserts, candidate_reverses,
+                                       candidate_deletes, blocked_paths_map_copy, False)
+            if self.pdag == xges_copy.pdag:
+                continue
+            if xges_copy.total_score - self.total_score > 1e-7:
+                self._logger.debug("EXTENDED SEARCH ACCEPTED: with increase {} and {}".format(
+                    xges_copy.total_score - self.total_score, delete_))
+                self.total_score = xges_copy.total_score
+                self.pdag = xges_copy.pdag
+                unblocked_paths_map = blocked_paths_map_copy
+                deletes_of_pdag_are_updated = False
+                self.statistics["extended_search-accepted"] += 1
+            else:
+                self._logger.debug("EXTENDED SEARCH REJECTED: {} {}".format(delete_, xges_copy.total_score))
+                self.statistics["extended_search-rejected"] += 1
+
     def update_operator_candidates_naive(
             self, candidate_inserts, candidate_reverses, candidate_deletes
     ):
@@ -154,9 +205,9 @@ class XGES:
     def update_operator_candidates_efficient(
             self,
             edge_modifications: EdgeModificationsMap,
-            candidate_inserts: List[Insert],
-            candidate_reverses: List[Reverse],
-            candidate_deletes: List[Delete],
+            candidate_inserts,
+            candidate_reverses,
+            candidate_deletes,
             unblocked_paths_map: Dict[Tuple[int, int], Set[Tuple[int, int]]]
     ):
         start_time = time.time()
