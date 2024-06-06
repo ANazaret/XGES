@@ -29,6 +29,8 @@ pip install xges
 The package can be used as follows:
 
 ```python
+from xges import XGES
+
 data = ...
 xges = XGES()
 pdag = xges.fit(data)  # PDAG object representing the Markov equivalence class (MEC)
