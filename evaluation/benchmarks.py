@@ -91,7 +91,7 @@ def run_fges(data, alpha=2.0):
     return nx.DiGraph(graph_adjacency_matrix.values.T)
 
 
-def run_xges(data, alpha=2.0, extended_search=True, ground_truth=None, baseline=""):
+def run_xges(data, alpha=2.0, extended_search=True, ground_truth=None, baseline="", verbose=0):
     """Run the XGES algorithm on the given data.
 
     This is a wrapper around the XGES algorithm from the C++ software xges.
@@ -136,7 +136,7 @@ def run_xges(data, alpha=2.0, extended_search=True, ground_truth=None, baseline=
         cmd += ["-g", truth_file]
     if not extended_search:
         cmd += ["-0"]
-    cmd += ["-v0"]  # verbose level 0
+    cmd += [f"-v{verbose}"]  # verbose level
 
     if DEBUG:
         print(" ".join(cmd))
