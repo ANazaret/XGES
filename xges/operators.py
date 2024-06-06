@@ -14,7 +14,13 @@ class Insert:
         return self.score < other.score
 
     def __str__(self):
-        return f"Insert: {self.x} → {self.y}, T = {_set(self.T)}, score = {self.score}, effective_parents = {_set(self.effective_parents)}"
+        return (
+            f"Insert: "
+            f"{self.x} → {self.y}, "
+            f"T = {_set(self.T)}, "
+            f"score = {self.score}, "
+            f"effective_parents = {_set(self.effective_parents)}"
+        )
 
     def __repr__(self):
         return str(self)
@@ -33,7 +39,13 @@ class Delete:
         return self.score < other.score
 
     def __str__(self):
-        return f"Delete: {self.x} {'→' if self.directed else '-'} {self.y}, C = {_set(self.C)}, score = {self.score}, effective_parents = {_set(self.effective_parents)}"
+        return (
+            f"Delete: "
+            f"{self.x} {'→' if self.directed else '-'} {self.y}, "
+            f"C = {_set(self.C)}, "
+            f"score = {self.score}, "
+            f"effective_parents = {_set(self.effective_parents)}"
+        )
 
     def __repr__(self):
         return str(self)
@@ -49,7 +61,13 @@ class Reverse:
         return self.score < other.score
 
     def __str__(self):
-        return f"Reverse: {self.insert.x} ← {self.insert.y}, T = {_set(self.insert.T)}, score = {self.score}, effective_parents = {_set(self.insert.effective_parents)}"
+        return (
+            f"Reverse: "
+            f"{self.insert.x} ← {self.insert.y}, "
+            f"T = {_set(self.insert.T)}, "
+            f"score = {self.score}, "
+            f"effective_parents = {_set(self.insert.effective_parents)}"
+        )
 
     def __repr__(self):
         return str(self)

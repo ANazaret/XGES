@@ -7,10 +7,9 @@ from typing import Dict, Tuple, Set
 import numpy as np
 from sortedcontainers import SortedListWithKey
 
-from bic_scorer import BICScorer
-from bic_scorer_fast import BICScorerFast
-from edge_queue_set import EdgeModificationsMap
-from scorer import ScorerInterface
+from xges.bic_scorer import BICScorer
+from xges.edge_queue_set import EdgeModificationsMap
+from xges.scorer import ScorerInterface
 from xges.pdag import PDAG
 from xges.operators import Insert, Delete, Reverse
 
@@ -71,7 +70,8 @@ class XGES:
         extended_search: bool (default=True)
             Whether to perform the extended search (XGES) or not (XGES-0).
         use_fast_numba: bool
-            Whether to use the fast Numba implementation of the BIC scorer. Ignored if scorer is provided.
+            Whether to use the fast Numba implementation of the BIC scorer.
+            Ignored if scorer is provided.
         scorer: ScorerInterface
             The scorer object to use. If None, the BIC scorer is used.
 
@@ -82,7 +82,7 @@ class XGES:
         self._initialize_from_data(X, use_fast_numba=use_fast_numba, scorer=scorer)
         return self.fit_xges(extended_search)
 
-    def get_pdag(self):
+    def get_pdag(self) -> PDAG:
         """
         Get the PDAG object representing the Markov equivalence class of the graph.
 
@@ -94,7 +94,10 @@ class XGES:
         return copy.deepcopy(self.pdag)
 
     def _initialize_from_data(
-            self, data: np.array, use_fast_numba: bool = True, scorer: ScorerInterface = None
+            self,
+            data: np.array,
+            use_fast_numba: bool = True,
+            scorer: ScorerInterface = None,
     ):
         """
         Initialize the XGES class from the data.
@@ -106,7 +109,17 @@ class XGES:
         if scorer is not None:
             self.scorer = scorer
         elif use_fast_numba:
-            self.scorer = BICScorerFast(data, alpha=self.alpha)
+            try:
+                from bic_scorer_fast import BICScorerFast
+
+                self.scorer = BICScorerFast(data, alpha=self.alpha)
+            except ImportError:
+                self._logger.warning(
+                    "Package `numba` not found. "
+                    "Falling back to the slower BICScorer implementation. "
+                    "Install `numba` for better performance with `pip install numba`."
+                )
+                self.scorer = BICScorer(data, alpha=self.alpha)
         else:
             self.scorer = BICScorer(data, alpha=self.alpha)
         self.initial_score = self.scorer.score_pdag(self.pdag)
@@ -159,10 +172,11 @@ class XGES:
         candidate_deletes: SortedListWithKey
             The list of candidate deletes (usually empty at the beginning).
         unblocked_paths_map: UnblockedPathsMap
-            The map of unblocked paths where the key is a tuple (x, y) and the value is a set of tuples (x, y) representing one
-            unblocked path found from x to y.
+            The map of unblocked paths where the key is a tuple (x, y) and the value is a
+            set of tuples (x, y) representing one unblocked path found from x to y.
         initialize_inserts: bool
-            Whether to initialize the inserts or not. If True, the candidate_inserts list is filled with the possible inserts.
+            Whether to initialize the inserts or not.
+            If True, the candidate_inserts list is filled with the possible inserts.
         """
         if initialize_inserts:
             if self.pdag.is_empty():
@@ -302,16 +316,21 @@ class XGES:
                 self.statistics["extended_search-accepted"] += 1
             else:
                 self._logger.debug(
-                    "EXTENDED SEARCH REJECTED: {} {}".format(delete_, xges_copy.total_score)
+                    "EXTENDED SEARCH REJECTED: {} {}".format(
+                        delete_, xges_copy.total_score
+                    )
                 )
                 self.statistics["extended_search-rejected"] += 1
 
     def _update_operator_candidates_naive(
-            self, candidate_inserts: SortedListWithKey, candidate_reverses: SortedListWithKey,
-            candidate_deletes: SortedListWithKey
+            self,
+            candidate_inserts: SortedListWithKey,
+            candidate_reverses: SortedListWithKey,
+            candidate_deletes: SortedListWithKey,
     ):
         """
-        Update the candidate operators of all variables. This is the naive implementation used by GES.
+        Update the candidate operators of all variables. This is the naive implementation used
+        by GES.
 
         XGES uses a more efficient implementation in `_update_operator_candidates_efficient`.
 
@@ -383,7 +402,9 @@ class XGES:
                 # y = b
                 full_insert_to_y.add(b)
                 # y \in Ne(a) ∩ Ne(b)
-                full_insert_to_y.update(self.pdag.get_neighbors(a) & self.pdag.get_neighbors(b))
+                full_insert_to_y.update(
+                    self.pdag.get_neighbors(a) & self.pdag.get_neighbors(b)
+                )
                 # x=a and y \in Ne(b)
                 for target in self.pdag.get_neighbors(b):
                     partial_insert_to_y[target].add(a)
@@ -464,8 +485,12 @@ class XGES:
                 # x \in  Ad(a) ∩ Ad(b) and y \in Ne(a) ∩ Ne(b) [almost never happens]
                 x_intersection = self.pdag.get_adjacent(a) & self.pdag.get_adjacent(b)
                 if x_intersection:
-                    y_intersection = self.pdag.get_neighbors(a) & self.pdag.get_neighbors(b)
-                    delete_x_y.update((x, y) for x in x_intersection for y in y_intersection)
+                    y_intersection = self.pdag.get_neighbors(
+                        a
+                    ) & self.pdag.get_neighbors(b)
+                    delete_x_y.update(
+                        (x, y) for x in x_intersection for y in y_intersection
+                    )
             elif modification_id in [4, 5]:
                 # a -- b becomes a → b
                 # a → b becomes a  b
@@ -485,7 +510,9 @@ class XGES:
                     full_reverse_to_y.add(a)
                 full_reverse_to_y.add(b)
                 # y \in Ne(a) ∩ Ne(b)
-                full_reverse_to_y.update(self.pdag.get_neighbors(a) & self.pdag.get_neighbors(b))
+                full_reverse_to_y.update(
+                    self.pdag.get_neighbors(a) & self.pdag.get_neighbors(b)
+                )
                 # x \in {a, b}
                 full_reverse_from_x.add(a)
                 full_reverse_from_x.add(b)
@@ -588,7 +615,9 @@ class XGES:
 
         self.statistics["update_operators-time"] += time.time() - start_time
 
-    def _find_inserts_to_y(self, y, candidate_inserts, parent_x=None, positive_only=True):
+    def _find_inserts_to_y(
+            self, y, candidate_inserts, parent_x=None, positive_only=True
+    ):
         adjacent_y = self.pdag.get_adjacent(y)
         parents_y = self.pdag.get_parents(y)
 
@@ -610,7 +639,9 @@ class XGES:
                 continue
 
             # 2. T ⊆ Ne(y) \ Ad(x)
-            neighbors_y_not_adjacent_x = list(self.pdag.get_neighbors_not_adjacent(y, x))
+            neighbors_y_not_adjacent_x = list(
+                self.pdag.get_neighbors_not_adjacent(y, x)
+            )
 
             effective_parents_y = neighbors_y_adjacent_x
             effective_parents_y.update(parents_y)
@@ -626,7 +657,9 @@ class XGES:
 
                 for i, z in enumerate(neighbors_y_not_adjacent_x[idx:]):
                     adjacent_z = self.pdag.get_adjacent(z)
-                    if T.issubset(adjacent_z) and neighbors_y_adjacent_x.issubset(adjacent_z):
+                    if T.issubset(adjacent_z) and neighbors_y_adjacent_x.issubset(
+                            adjacent_z
+                    ):
                         T_prime = T.copy()
                         T_prime.add(z)
                         effective_parents_prime = effective_parents.copy()
@@ -645,7 +678,9 @@ class XGES:
 
             score = self.scorer.score_delete(y, list(effective_parents), x)
             if score > 0 or not positive_only:
-                candidate_deletes.add(Delete(x, y, C, score, effective_parents, directed_xy))
+                candidate_deletes.add(
+                    Delete(x, y, C, score, effective_parents, directed_xy)
+                )
 
             for i, z in enumerate(neighbors_y_adjacent_x[idx:]):
                 adjacent_z = self.pdag.get_adjacent(z)
@@ -673,7 +708,7 @@ class XGES:
         for x in children_y:
             parents_x = self.pdag.get_parents(x)
             candidate_inserts = set()
-            self._find_inserts_to_y(y, candidate_inserts, x, False)
+            self._find_inserts_to_y(y, candidate_inserts, x, positive_only=False)
 
             for insert in candidate_inserts:
                 score = insert.score + self.scorer.score_delete(x, parents_x, y)
@@ -684,7 +719,7 @@ class XGES:
         if not self.pdag.has_directed_edge(y, x):
             return
         candidate_inserts = set()
-        self._find_inserts_to_y(y, candidate_inserts, x, False)
+        self._find_inserts_to_y(y, candidate_inserts, x, positive_only=False)
         parents_x = self.pdag.get_parents(x)
         for insert in candidate_inserts:
             score = insert.score + self.scorer.score_delete(x, parents_x, y)

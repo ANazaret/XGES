@@ -38,7 +38,9 @@ class Edge:
         return self.type < other.type
 
     def is_directed(self):
-        return self.type == EdgeType.DIRECTED_TO_X or self.type == EdgeType.DIRECTED_TO_Y
+        return (
+            self.type == EdgeType.DIRECTED_TO_X or self.type == EdgeType.DIRECTED_TO_Y
+        )
 
     def get_source(self):
         if self.type == EdgeType.DIRECTED_TO_X:
@@ -104,14 +106,24 @@ class EdgeModification:
 
     def is_reverse(self):
         return (
-            self.old_type == EdgeType.DIRECTED_TO_X and self.new_type == EdgeType.DIRECTED_TO_Y
-        ) or (self.old_type == EdgeType.DIRECTED_TO_Y and self.new_type == EdgeType.DIRECTED_TO_X)
+            self.old_type == EdgeType.DIRECTED_TO_X
+            and self.new_type == EdgeType.DIRECTED_TO_Y
+        ) or (
+            self.old_type == EdgeType.DIRECTED_TO_Y
+            and self.new_type == EdgeType.DIRECTED_TO_X
+        )
 
     def is_new_directed(self):
-        return self.new_type == EdgeType.DIRECTED_TO_X or self.new_type == EdgeType.DIRECTED_TO_Y
+        return (
+            self.new_type == EdgeType.DIRECTED_TO_X
+            or self.new_type == EdgeType.DIRECTED_TO_Y
+        )
 
     def is_old_directed(self):
-        return self.old_type == EdgeType.DIRECTED_TO_X or self.old_type == EdgeType.DIRECTED_TO_Y
+        return (
+            self.old_type == EdgeType.DIRECTED_TO_X
+            or self.old_type == EdgeType.DIRECTED_TO_Y
+        )
 
     def is_new_undirected(self):
         return self.new_type == EdgeType.UNDIRECTED
@@ -212,7 +224,9 @@ class EdgeModificationsMap:
             else:
                 self.edge_modifications[edge_key].new_type = new_type
         else:
-            self.edge_modifications[edge_key] = EdgeModification(small, big, old_type, new_type)
+            self.edge_modifications[edge_key] = EdgeModification(
+                small, big, old_type, new_type
+            )
 
     def clear(self):
         self.edge_modifications.clear()

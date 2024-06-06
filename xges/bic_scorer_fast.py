@@ -1,7 +1,6 @@
 import numpy as np
 from scipy.special import gammaln
 from collections import defaultdict
-from time import time
 from xges.scorer import ScorerInterface
 
 import numba as nb
@@ -19,9 +18,10 @@ import numba as nb
 )
 def score_all_pairs(cov, n, alpha=1.0):
     """
-    Return a matrix of all the diff scores for all pairs of variables. In [i,j] is the score of inserting i in the
-    parents of j.
-    Insert(i,j) = score(j, [i]) - score(j, []) = `-n/2 log(1-Cov_{i,j}^2/(Cov_{i,i}Cov_{j,j}) - alpha log n/2`
+    Return a matrix of all the diff scores for all pairs of variables.
+    In [i,j] is the score of inserting i in the parents of j.
+    Insert(i,j) = score(j, [i]) - score(j, [])
+                =`-n/2 log(1-Cov_{i,j}^2/(Cov_{i,i}Cov_{j,j}) - alpha log n/2`
     """
     diag_sqrt = np.sqrt(np.diag(cov))
     corr = cov / np.outer(diag_sqrt, diag_sqrt)
@@ -122,7 +122,11 @@ class BICScorerFast(ScorerInterface):
         self.statistics["local_score-#calls-nocache"] += 1
 
         bic = local_bic_fast(
-            target, np.array(parents, dtype=int), self.n_samples, self.covariance_matrix, self.alpha
+            target,
+            np.array(parents, dtype=int),
+            self.n_samples,
+            self.covariance_matrix,
+            self.alpha,
         )
 
         self.cache[target][cache_key] = bic

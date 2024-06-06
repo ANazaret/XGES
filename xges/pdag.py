@@ -4,7 +4,7 @@ from collections import defaultdict, deque
 
 import numpy as np
 
-from edge_queue_set import EdgeQueueSet, EdgeType
+from xges.edge_queue_set import EdgeQueueSet, EdgeType
 
 
 class PDAG:
@@ -20,21 +20,20 @@ class PDAG:
 
     """
 
-    # TODO replace defaultdict with list of sets
     def __init__(self, num_nodes):
         self.num_nodes = num_nodes
-        self.children = defaultdict(set)
-        self.parents = defaultdict(set)
-        self.neighbors = defaultdict(set)
-        self.adjacent = defaultdict(set)
-        self.adjacent_reachable = defaultdict(set)
+        self.children = [set() for _ in range(self.num_nodes)]
+        self.parents = [set() for _ in range(self.num_nodes)]
+        self.neighbors = [set() for _ in range(self.num_nodes)]
+        self.adjacent = [set() for _ in range(self.num_nodes)]
+        self.adjacent_reachable = [set() for _ in range(self.num_nodes)]
 
         self.number_of_undirected_edges = 0
         self.number_of_directed_edges = 0
 
         self.nodes = set(range(self.num_nodes))
 
-        self.forbidden_insert_parents = defaultdict(set)
+        self.forbidden_insert_parents = [set() for _ in range(self.num_nodes)]
 
         self.block_semi_directed_path_visited = np.zeros(self.num_nodes, dtype=int)
         self.block_semi_directed_path_blocked = np.zeros(self.num_nodes, dtype=int)
@@ -78,7 +77,9 @@ class PDAG:
 
     def is_empty(self):
         # To change if we allow known edges at the beginning
-        return self.number_of_directed_edges == 0 and self.number_of_undirected_edges == 0
+        return (
+            self.number_of_directed_edges == 0 and self.number_of_undirected_edges == 0
+        )
 
     def remove_directed_edge(self, x, y):
         self.children[x].remove(y)
@@ -161,14 +162,18 @@ class PDAG:
             # 1. x and y are not adjacent
             if y in adjacent_x:
                 self.statistics["is_insert_valid-false_1a-#"] += 1
-                self.statistics["is_insert_valid-false-time"] += time.time() - start_time
+                self.statistics["is_insert_valid-false-time"] += (
+                    time.time() - start_time
+                )
                 return False
         else:
             # 1. x ← y
             parents_x = self.parents[x]
             if y not in parents_x:
                 self.statistics["is_insert_valid-false_1b-#"] += 1
-                self.statistics["is_insert_valid-false-time"] += time.time() - start_time
+                self.statistics["is_insert_valid-false-time"] += (
+                    time.time() - start_time
+                )
                 return False
 
         # 2. T ⊆ Ne(y) \ Ad(x)
@@ -268,7 +273,11 @@ class PDAG:
             reachable = self.get_adjacent_reachable(node)
 
             for n in reachable:
-                if visited[n] or blocked[n] or (node == y and n == x and ignore_direct_edge):
+                if (
+                    visited[n]
+                    or blocked[n]
+                    or (node == y and n == x and ignore_direct_edge)
+                ):
                     continue
                 self.block_semi_directed_path_parent[n] = node
                 if n == x:
@@ -287,7 +296,9 @@ class PDAG:
                 visited[n] = 1
 
         self.statistics["block_semi_directed_paths-true-#"] += 1
-        self.statistics["block_semi_directed_paths-true-time"] += time.time() - start_time
+        self.statistics["block_semi_directed_paths-true-time"] += (
+            time.time() - start_time
+        )
         return True
 
     def apply_insert(self, insert, edge_modifications_map):
@@ -331,14 +342,22 @@ class PDAG:
         if self.has_directed_edge(delet.x, delet.y):
             # 1. remove the directed edge x → y
             self.remove_directed_edge(delet.x, delet.y)
-            edge_modifications_map.update_edge_none(delet.x, delet.y, EdgeType.DIRECTED_TO_Y)
+            edge_modifications_map.update_edge_none(
+                delet.x, delet.y, EdgeType.DIRECTED_TO_Y
+            )
         else:
             # 1. remove the undirected edge x - y
             self.remove_undirected_edge(delet.x, delet.y)
-            edge_modifications_map.update_edge_none(delet.x, delet.y, EdgeType.UNDIRECTED)
+            edge_modifications_map.update_edge_none(
+                delet.x, delet.y, EdgeType.UNDIRECTED
+            )
 
         # H = Ne(y) ∩ Ad(x) \ C
-        H = self.get_neighbors(delet.y).intersection(self.get_adjacent(delet.x)).difference(delet.C)
+        H = (
+            self.get_neighbors(delet.y)
+            .intersection(self.get_adjacent(delet.x))
+            .difference(delet.C)
+        )
 
         # 2. for each h ∈ H:
         #   - orient the (previously undirected) edges between h and y as y → h
@@ -351,7 +370,9 @@ class PDAG:
             if self.has_undirected_edge(delet.x, h):
                 self.remove_undirected_edge(delet.x, h)
                 self.add_directed_edge(delet.x, h)
-                edge_modifications_map.update_edge_directed(delet.x, h, EdgeType.UNDIRECTED)
+                edge_modifications_map.update_edge_directed(
+                    delet.x, h, EdgeType.UNDIRECTED
+                )
 
         edges_to_check = EdgeQueueSet()
         self.add_adjacent_edges(delet.x, delet.y, edges_to_check)
@@ -408,7 +429,10 @@ class PDAG:
         candidates_w = self.neighbors[x].intersection(self.neighbors[y])
         for candidate_w in candidates_w:
             for candidate_z in self.children[candidate_w]:
-                if y in self.children[candidate_z] and x not in self.adjacent[candidate_z]:
+                if (
+                    y in self.children[candidate_z]
+                    and x not in self.adjacent[candidate_z]
+                ):
                     return True
         return False
 
@@ -434,7 +458,9 @@ class PDAG:
                 ):
                     self.remove_directed_edge(x, y)
                     self.add_undirected_edge(x, y)
-                    edge_modifications_map.update_edge_undirected(x, y, EdgeType.DIRECTED_TO_Y)
+                    edge_modifications_map.update_edge_undirected(
+                        x, y, EdgeType.DIRECTED_TO_Y
+                    )
                     self.add_adjacent_edges(x, y, edges_to_check)
             else:
                 x = edge.get_x()
@@ -486,7 +512,17 @@ class PDAG:
                     return False
         return True
 
-    def get_dag_extension(self):
+    def get_dag_extension(self) -> "PDAG":
+        """
+        Get a DAG in the Markov equivalence class of the PDAG.
+
+        The returned DAG is also a PDAG object, but with only directed edges.
+
+        Returns
+        -------
+        PDAG
+            A DAG in the Markov equivalence class of the PDAG.
+        """
         dag_extension = copy.deepcopy(self)
         dag_tmp = copy.deepcopy(self)
         nodes_tmp = set(self.nodes)
