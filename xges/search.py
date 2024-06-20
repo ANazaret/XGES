@@ -51,6 +51,10 @@ class XGES:
         self.statistics = None
 
         logger = logging.getLogger()
+        # set a default handler to console if not already set
+        if not logger.handlers:
+            logger.addHandler(logging.StreamHandler())
+            logger.handlers[0].setFormatter(logging.Formatter("XGES: %(message)s"))
         self._logger = logger
 
     def fit(
@@ -59,6 +63,7 @@ class XGES:
         extended_search: bool = True,
         use_fast_numba: bool = True,
         scorer: ScorerInterface = None,
+        verbose: int = 1,
     ) -> PDAG:
         """
         Fit the XGES algorithm to the data.
@@ -74,14 +79,32 @@ class XGES:
             Ignored if scorer is provided.
         scorer: ScorerInterface
             The scorer object to use. If None, the BIC scorer is used.
+        verbose: int
+            The verbosity level.
+            0 is silent, 1 provides information before and after the search,
+            2 provides information during the search and 3 provides very detailed information
+            during the search. Default is 1.
 
         Returns
         -------
         PDAG:
             The PDAG object representing the Markov equivalence class of the graph.
         """
+        logging.basicConfig(level=0)
+        if verbose == 0:
+            self._logger.setLevel(logging.CRITICAL)
+        elif verbose == 1:
+            self._logger.setLevel(logging.INFO)
+        elif verbose == 2:
+            self._logger.setLevel(logging.DEBUG)
+        elif verbose == 3:
+            self._logger.setLevel(5)
+
         self._initialize_from_data(X, use_fast_numba=use_fast_numba, scorer=scorer)
         return self.fit_xges(extended_search)
+        res = self.fit_xges(extended_search)
+        self.graph_fitted = True
+        return res
 
     def get_pdag(self) -> PDAG:
         """
@@ -132,7 +155,7 @@ class XGES:
             self.scorer = scorer
         elif use_fast_numba:
             try:
-                from bic_scorer_fast import BICScorerFast
+                from xges.bic_scorer_fast import BICScorerFast
 
                 self.scorer = BICScorerFast(data, alpha=self.alpha)
             except ImportError:
@@ -307,7 +330,9 @@ class XGES:
             xges_copy.total_score += delete_.score
             xges_copy.pdag.add_forbidden_insert(delete_.x, delete_.y)
             blocked_paths_map_copy = copy.deepcopy(unblocked_paths_map)
-            self._logger.debug(f"EXTENDED SEARCH: {delete_}")
+            self._logger.debug(
+                f"EXTENDED SEARCH {len(all_edge_deletes)} left (before updating deletes)"
+            )
             for snd in edge_modifications:
                 self._logger.log(5, f"\tEdge {snd}")
 
