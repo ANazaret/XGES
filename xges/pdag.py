@@ -77,9 +77,7 @@ class PDAG:
 
     def is_empty(self):
         # To change if we allow known edges at the beginning
-        return (
-            self.number_of_directed_edges == 0 and self.number_of_undirected_edges == 0
-        )
+        return self.number_of_directed_edges == 0 and self.number_of_undirected_edges == 0
 
     def remove_directed_edge(self, x, y):
         self.children[x].remove(y)
@@ -162,18 +160,14 @@ class PDAG:
             # 1. x and y are not adjacent
             if y in adjacent_x:
                 self.statistics["is_insert_valid-false_1a-#"] += 1
-                self.statistics["is_insert_valid-false-time"] += (
-                    time.time() - start_time
-                )
+                self.statistics["is_insert_valid-false-time"] += time.time() - start_time
                 return False
         else:
             # 1. x ← y
             parents_x = self.parents[x]
             if y not in parents_x:
                 self.statistics["is_insert_valid-false_1b-#"] += 1
-                self.statistics["is_insert_valid-false-time"] += (
-                    time.time() - start_time
-                )
+                self.statistics["is_insert_valid-false-time"] += time.time() - start_time
                 return False
 
         # 2. T ⊆ Ne(y) \ Ad(x)
@@ -273,11 +267,7 @@ class PDAG:
             reachable = self.get_adjacent_reachable(node)
 
             for n in reachable:
-                if (
-                    visited[n]
-                    or blocked[n]
-                    or (node == y and n == x and ignore_direct_edge)
-                ):
+                if visited[n] or blocked[n] or (node == y and n == x and ignore_direct_edge):
                     continue
                 self.block_semi_directed_path_parent[n] = node
                 if n == x:
@@ -296,9 +286,7 @@ class PDAG:
                 visited[n] = 1
 
         self.statistics["block_semi_directed_paths-true-#"] += 1
-        self.statistics["block_semi_directed_paths-true-time"] += (
-            time.time() - start_time
-        )
+        self.statistics["block_semi_directed_paths-true-time"] += time.time() - start_time
         return True
 
     def apply_insert(self, insert, edge_modifications_map):
@@ -342,22 +330,14 @@ class PDAG:
         if self.has_directed_edge(delet.x, delet.y):
             # 1. remove the directed edge x → y
             self.remove_directed_edge(delet.x, delet.y)
-            edge_modifications_map.update_edge_none(
-                delet.x, delet.y, EdgeType.DIRECTED_TO_Y
-            )
+            edge_modifications_map.update_edge_none(delet.x, delet.y, EdgeType.DIRECTED_TO_Y)
         else:
             # 1. remove the undirected edge x - y
             self.remove_undirected_edge(delet.x, delet.y)
-            edge_modifications_map.update_edge_none(
-                delet.x, delet.y, EdgeType.UNDIRECTED
-            )
+            edge_modifications_map.update_edge_none(delet.x, delet.y, EdgeType.UNDIRECTED)
 
         # H = Ne(y) ∩ Ad(x) \ C
-        H = (
-            self.get_neighbors(delet.y)
-            .intersection(self.get_adjacent(delet.x))
-            .difference(delet.C)
-        )
+        H = self.get_neighbors(delet.y).intersection(self.get_adjacent(delet.x)).difference(delet.C)
 
         # 2. for each h ∈ H:
         #   - orient the (previously undirected) edges between h and y as y → h
@@ -370,9 +350,7 @@ class PDAG:
             if self.has_undirected_edge(delet.x, h):
                 self.remove_undirected_edge(delet.x, h)
                 self.add_directed_edge(delet.x, h)
-                edge_modifications_map.update_edge_directed(
-                    delet.x, h, EdgeType.UNDIRECTED
-                )
+                edge_modifications_map.update_edge_directed(delet.x, h, EdgeType.UNDIRECTED)
 
         edges_to_check = EdgeQueueSet()
         self.add_adjacent_edges(delet.x, delet.y, edges_to_check)
@@ -429,10 +407,7 @@ class PDAG:
         candidates_w = self.neighbors[x].intersection(self.neighbors[y])
         for candidate_w in candidates_w:
             for candidate_z in self.children[candidate_w]:
-                if (
-                    y in self.children[candidate_z]
-                    and x not in self.adjacent[candidate_z]
-                ):
+                if y in self.children[candidate_z] and x not in self.adjacent[candidate_z]:
                     return True
         return False
 
@@ -458,9 +433,7 @@ class PDAG:
                 ):
                     self.remove_directed_edge(x, y)
                     self.add_undirected_edge(x, y)
-                    edge_modifications_map.update_edge_undirected(
-                        x, y, EdgeType.DIRECTED_TO_Y
-                    )
+                    edge_modifications_map.update_edge_undirected(x, y, EdgeType.DIRECTED_TO_Y)
                     self.add_adjacent_edges(x, y, edges_to_check)
             else:
                 x = edge.get_x()
@@ -615,10 +588,7 @@ class PDAG:
 
     def __str__(self):
         undirected_edges_str = ", ".join(
-            f"{x} - {y}"
-            for x in range(self.num_nodes)
-            for y in self.neighbors[x]
-            if x < y
+            f"{x} - {y}" for x in range(self.num_nodes) for y in self.neighbors[x] if x < y
         )
         directed_edges_str = ", ".join(
             f"{x} → {y}" for x in range(self.num_nodes) for y in self.children[x]
@@ -631,3 +601,34 @@ class PDAG:
 
     def __repr__(self):
         return str(self)
+
+    @staticmethod
+    def from_networkx(G):
+        """
+        Create a PDAG from a networkx DiGraph object.
+
+        The networkx DiGraph object should represent the PDAG, where the PDAG undirected edges are
+        represented using two directed edges in opposite directions.
+
+        Parameters
+        ----------
+        G : nx.DiGraph
+            The networkx DiGraph object representing the PDAG.
+
+        Returns
+        -------
+        PDAG
+            The PDAG object representing the networkx DiGraph.
+
+        See Also
+        --------
+        to_networkx : Convert the PDAG to a networkx DiGraph object.
+        """
+        pdag = PDAG(G.number_of_nodes())
+        for x, y in G.edges:
+            pdag.add_directed_edge(x, y)
+        pdag.complete_cpdag()
+        return pdag
+
+    def complete_cpdag(self):
+        pass

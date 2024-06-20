@@ -33,10 +33,13 @@ def test_trivial_data():
     assert pdag.get_number_of_edges() == 0
 
 
-@pytest.mark.parametrize("data, directed_edges, undirected_edges", [
-    ("generate_v_structure_data", [(0, 1), (2, 1)], []),
-    ("generate_chain_data", [], [(0, 1), (1, 2)]),
-])
+@pytest.mark.parametrize(
+    "data, directed_edges, undirected_edges",
+    [
+        ("generate_v_structure_data", [(0, 1), (2, 1)], []),
+        ("generate_chain_data", [], [(0, 1), (1, 2)]),
+    ],
+)
 def test_three_nodes(data, directed_edges, undirected_edges, request):
     data = request.getfixturevalue(data)
     xges = XGES()
@@ -50,6 +53,7 @@ def test_three_nodes(data, directed_edges, undirected_edges, request):
 
     for edge in undirected_edges:
         assert pdag.has_undirected_edge(*edge)
+
 
 def test_numba():
     data = generate_independent_data(200, 3)

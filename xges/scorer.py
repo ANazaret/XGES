@@ -14,14 +14,23 @@ class ScorerInterface(ABC):
         pass
 
     def score_all_pairs(self):
+        """
+        Return a matrix such that in [i,j] is the score of inserting i in the parents of j
+        compared to the empty set.
+
+        Insert(i,j) = score(j, [i]) - score(j, [])
+
+        Returns
+        -------
+        scores : np.ndarray
+            Matrix of scores
+        """
         scores = np.zeros((self.n_variables, self.n_variables))
         for i in range(self.n_variables):
             for j in range(self.n_variables):
                 if i == j:
                     continue
-                # i to j is the same as j to i
-                parents = {i}
-                scores[i, j] = self.local_score(j, parents) - self.local_score(j, set())
+                scores[i, j] = self.local_score(j, {i}) - self.local_score(j, set())
 
         return scores
 
