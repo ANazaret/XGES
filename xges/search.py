@@ -50,7 +50,7 @@ class XGES:
         self.total_score = None
         self.statistics = None
 
-        logger = logging.getLogger()
+        logger = logging.getLogger("xges")
         # set a default handler to console if not already set
         if not logger.handlers:
             logger.addHandler(logging.StreamHandler())
@@ -90,7 +90,6 @@ class XGES:
         PDAG:
             The PDAG object representing the Markov equivalence class of the graph.
         """
-        logging.basicConfig(level=0)
         if verbose == 0:
             self._logger.setLevel(logging.CRITICAL)
         elif verbose == 1:
