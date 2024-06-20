@@ -325,7 +325,7 @@ class PDAG:
         for t in T:
             self.add_adjacent_edges(t, y, edges_to_check)
 
-        self.complete_cpdag(edges_to_check, edge_modifications_map)
+        self.complete_cpdag_efficient(edges_to_check, edge_modifications_map)
         self.statistics["apply_insert-time"] += time.time() - start_time
 
     def apply_reverse(self, reverse, edge_modifications_map):
@@ -380,7 +380,7 @@ class PDAG:
             self.add_adjacent_edges(h, delet.y, edges_to_check)
             self.add_adjacent_edges(delet.x, h, edges_to_check)
 
-        self.complete_cpdag(edges_to_check, edge_modifications_map)
+        self.complete_cpdag_efficient(edges_to_check, edge_modifications_map)
         self.statistics["apply_delete-time"] += time.time() - start_time
 
     def add_adjacent_edges(self, x, y, edge_queue_set):
@@ -444,7 +444,7 @@ class PDAG:
                 return True
         return False
 
-    def complete_cpdag(self, edges_to_check, edge_modifications_map):
+    def complete_cpdag_efficient(self, edges_to_check, edge_modifications_map):
         while not edges_to_check.empty():
             edge = edges_to_check.pop()
             if edge.is_directed():
