@@ -47,9 +47,7 @@ class BICScorer(ScorerInterface):
             print("Negative sigma")
         log_likelihood_no_constant = -0.5 * self.n_samples * (1 + np.log(sigma))
 
-        bic_regularization = (
-            0.5 * np.log(self.n_samples) * (len(parents) + 1.0) * self.alpha
-        )
+        bic_regularization = 0.5 * np.log(self.n_samples) * (len(parents) + 1.0) * self.alpha
 
         bic = log_likelihood_no_constant - bic_regularization
 
