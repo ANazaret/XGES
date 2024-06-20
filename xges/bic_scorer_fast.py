@@ -112,6 +112,10 @@ class BICScorerFast(ScorerInterface):
         self.cache_score_all_pairs = score_all_pairs(
             self.covariance_matrix, self.n_samples, self.alpha
         )
+        # update cache
+        for i in range(self.n_variables):
+            for j in range(self.n_variables):
+                self.cache[j][(i,)] = self.cache_score_all_pairs[i, j]
         return self.cache_score_all_pairs
 
     def local_score(self, target, parents):

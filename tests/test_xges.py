@@ -28,7 +28,7 @@ def test_trivial_data():
     data = generate_independent_data(200, 3)
 
     xges = XGES()
-    xges.fit(data)
+    xges.fit(data, use_fast_numba=False)
     pdag = xges.get_pdag()
     assert pdag.get_number_of_edges() == 0
 
@@ -40,7 +40,7 @@ def test_trivial_data():
 def test_three_nodes(data, directed_edges, undirected_edges, request):
     data = request.getfixturevalue(data)
     xges = XGES()
-    xges.fit(data)
+    xges.fit(data, use_fast_numba=False)
     pdag = xges.get_pdag()
 
     assert pdag.number_of_directed_edges == len(directed_edges)
@@ -50,3 +50,11 @@ def test_three_nodes(data, directed_edges, undirected_edges, request):
 
     for edge in undirected_edges:
         assert pdag.has_undirected_edge(*edge)
+
+def test_numba():
+    data = generate_independent_data(200, 3)
+
+    xges = XGES()
+    xges.fit(data, use_fast_numba=True)
+    pdag = xges.get_pdag()
+    assert pdag.get_number_of_edges() == 0
