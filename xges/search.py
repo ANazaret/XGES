@@ -44,6 +44,7 @@ class XGES:
     def __init__(self, alpha: float = 2.0):
         self.alpha = alpha
         self.n_variables = None
+        self.n_observations = None
         self.scorer = None
         self.pdag = None
         self.initial_score = None
@@ -148,6 +149,7 @@ class XGES:
 
         See fit() for the parameters.
         """
+        self.n_observations = data.shape[0]
         self.n_variables = data.shape[1]
         self.pdag = PDAG(self.n_variables)
         if scorer is not None:
@@ -351,7 +353,7 @@ class XGES:
             )
             if self.pdag == xges_copy.pdag:
                 continue
-            if xges_copy.total_score - self.total_score > 1e-7:
+            if xges_copy.total_score - self.total_score > 1e-7 * self.n_observations:
                 increase = xges_copy.total_score - self.total_score
                 self._logger.debug(
                     f"EXTENDED SEARCH ACCEPTED: with increase {increase} and {delete_}"
