@@ -1,5 +1,5 @@
-import pytest
 import numpy as np
+import pytest
 
 from xges import XGES
 
@@ -9,14 +9,14 @@ def generate_independent_data(n, d):
     return X
 
 
-@pytest.fixture
+@pytest.fixture()
 def generate_v_structure_data(n=200):
     X = np.random.randn(n, 3)
     X[:, 1] = X[:, 1] * 0.5 + X[:, 0] + X[:, 2]
     return X
 
 
-@pytest.fixture
+@pytest.fixture()
 def generate_chain_data(n=200):
     X = np.random.randn(n, 3)
     X[:, 1] = X[:, 0] + X[:, 1] * 0.5

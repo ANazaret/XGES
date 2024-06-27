@@ -364,9 +364,7 @@ class XGES:
                 deletes_of_pdag_are_updated = False
                 self.statistics["extended_search-accepted"] += 1
             else:
-                self._logger.debug(
-                    f"EXTENDED SEARCH REJECTED: {delete_} {xges_copy.total_score}"
-                )
+                self._logger.debug(f"EXTENDED SEARCH REJECTED: {delete_} {xges_copy.total_score}")
                 self.statistics["extended_search-rejected"] += 1
 
     def _update_operator_candidates_naive(
@@ -449,9 +447,7 @@ class XGES:
                 # y = b
                 full_insert_to_y.add(b)
                 # y \in Ne(a) ∩ Ne(b)
-                full_insert_to_y.update(
-                    self.pdag.get_neighbors(a) & self.pdag.get_neighbors(b)
-                )
+                full_insert_to_y.update(self.pdag.get_neighbors(a) & self.pdag.get_neighbors(b))
                 # x=a and y \in Ne(b)
                 for target in self.pdag.get_neighbors(b):
                     partial_insert_to_y[target].add(a)
@@ -532,12 +528,8 @@ class XGES:
                 # x \in  Ad(a) ∩ Ad(b) and y \in Ne(a) ∩ Ne(b) [almost never happens]
                 x_intersection = self.pdag.get_adjacent(a) & self.pdag.get_adjacent(b)
                 if x_intersection:
-                    y_intersection = self.pdag.get_neighbors(
-                        a
-                    ) & self.pdag.get_neighbors(b)
-                    delete_x_y.update(
-                        (x, y) for x in x_intersection for y in y_intersection
-                    )
+                    y_intersection = self.pdag.get_neighbors(a) & self.pdag.get_neighbors(b)
+                    delete_x_y.update((x, y) for x in x_intersection for y in y_intersection)
             elif modification_id in [4, 5]:
                 # a -- b becomes a → b
                 # a → b becomes a  b
@@ -557,9 +549,7 @@ class XGES:
                     full_reverse_to_y.add(a)
                 full_reverse_to_y.add(b)
                 # y \in Ne(a) ∩ Ne(b)
-                full_reverse_to_y.update(
-                    self.pdag.get_neighbors(a) & self.pdag.get_neighbors(b)
-                )
+                full_reverse_to_y.update(self.pdag.get_neighbors(a) & self.pdag.get_neighbors(b))
                 # x \in {a, b}
                 full_reverse_from_x.add(a)
                 full_reverse_from_x.add(b)
@@ -662,9 +652,7 @@ class XGES:
 
         self.statistics["update_operators-time"] += time.time() - start_time
 
-    def _find_inserts_to_y(
-        self, y, candidate_inserts, parent_x=None, positive_only=True
-    ):
+    def _find_inserts_to_y(self, y, candidate_inserts, parent_x=None, positive_only=True):
         adjacent_y = self.pdag.get_adjacent(y)
         parents_y = self.pdag.get_parents(y)
 
@@ -686,9 +674,7 @@ class XGES:
                 continue
 
             # 2. T ⊆ Ne(y) \ Ad(x)
-            neighbors_y_not_adjacent_x = list(
-                self.pdag.get_neighbors_not_adjacent(y, x)
-            )
+            neighbors_y_not_adjacent_x = list(self.pdag.get_neighbors_not_adjacent(y, x))
 
             effective_parents_y = neighbors_y_adjacent_x
             effective_parents_y.update(parents_y)
@@ -704,9 +690,7 @@ class XGES:
 
                 for i, z in enumerate(neighbors_y_not_adjacent_x[idx:]):
                     adjacent_z = self.pdag.get_adjacent(z)
-                    if T.issubset(adjacent_z) and neighbors_y_adjacent_x.issubset(
-                        adjacent_z
-                    ):
+                    if T.issubset(adjacent_z) and neighbors_y_adjacent_x.issubset(adjacent_z):
                         T_prime = T.copy()
                         T_prime.add(z)
                         effective_parents_prime = effective_parents.copy()
@@ -725,9 +709,7 @@ class XGES:
 
             score = self.scorer.score_delete(y, list(effective_parents), x)
             if score > 0 or not positive_only:
-                candidate_deletes.add(
-                    Delete(x, y, C, score, effective_parents, directed_xy)
-                )
+                candidate_deletes.add(Delete(x, y, C, score, effective_parents, directed_xy))
 
             for i, z in enumerate(neighbors_y_adjacent_x[idx:]):
                 adjacent_z = self.pdag.get_adjacent(z)

@@ -26,8 +26,12 @@ class PDAG:
         return self.number_of_directed_edges + self.number_of_undirected_edges
 
     def __eq__(self, other):
-        same_directed_edges = all([self.children[node] == other.children[node] for node in self.nodes])
-        same_undirected_edges = all([self.neighbors[node] == other.neighbors[node] for node in self.nodes])
+        same_directed_edges = all(
+            [self.children[node] == other.children[node] for node in self.nodes]
+        )
+        same_undirected_edges = all(
+            [self.neighbors[node] == other.neighbors[node] for node in self.nodes]
+        )
         return same_directed_edges and same_undirected_edges
 
     def get_directed_edges(self):
@@ -103,7 +107,10 @@ class PDAG:
 
     def __repr__(self):
         edges = [f"{u} -> {v}" for u in sorted(self.children) for v in sorted(self.children[u])] + [
-            f"{u} -- {v}" for u in sorted(self.neighbors) for v in sorted(self.neighbors[u]) if u < v
+            f"{u} -- {v}"
+            for u in sorted(self.neighbors)
+            for v in sorted(self.neighbors[u])
+            if u < v
         ]
         return f"PDAG({', '.join(edges)})"
 

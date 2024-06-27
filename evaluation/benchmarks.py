@@ -12,8 +12,8 @@ import numpy as np
 import pandas as pd
 import sempler
 
-from bic_score import BICScorer
-from pdag import compute_shd_cpdag, PDAG
+from .bic_score import BICScorer
+from .pdag import PDAG, compute_shd_cpdag
 
 
 def run_ges(data, alpha=2.0, phases=("forward", "backward", "turning")):
@@ -70,7 +70,7 @@ def run_fges(data, alpha=2.0):
     import jpype.imports
 
     try:
-        jpype.startJVM(classpath=[f"resources/tetrad-current.jar"])
+        jpype.startJVM(classpath=["resources/tetrad-current.jar"])
     except OSError:
         pass
     from tools import TetradSearch as ts
@@ -87,7 +87,9 @@ def run_fges(data, alpha=2.0):
     # encode the tails of arrows as 1
     # undirected edges have two tails, so they are encoded (1,1), corresponding to two directed edges
     # then we transpose the matrix to have the 1 toward the head of the arrow
-    graph_adjacency_matrix = search.get_graph_to_matrix(nullEpt=0, circleEpt=0, arrowEpt=0, tailEpt=1)
+    graph_adjacency_matrix = search.get_graph_to_matrix(
+        nullEpt=0, circleEpt=0, arrowEpt=0, tailEpt=1
+    )
     return nx.DiGraph(graph_adjacency_matrix.values.T)
 
 
@@ -129,7 +131,17 @@ def run_xges(data, alpha=2.0, extended_search=True, ground_truth=None, baseline=
     # xges --input <data input> -a <alpha> --output <output file> --stats <stats file> -v0 [-0] [-g <ground truth>]
     # -0: run only XGES-0 (no extended search)
     xges_path = "../cmake-build-release/src/xges"
-    cmd = [xges_path, "--input", in_file, "-a", str(alpha), "--output", out_file, "--stats", stats_file]
+    cmd = [
+        xges_path,
+        "--input",
+        in_file,
+        "-a",
+        str(alpha),
+        "--output",
+        out_file,
+        "--stats",
+        stats_file,
+    ]
     if ground_truth is not None:
         df = pd.DataFrame(nx.to_numpy_array(ground_truth, nodelist=list(range(data.shape[1]))))
         df.to_csv(truth_file, index=False)
@@ -166,13 +178,13 @@ def run_xges(data, alpha=2.0, extended_search=True, ground_truth=None, baseline=
 
 
 def simulation(
-        d,
-        n_control=1000,
-        edges_per_d=2,
-        seed=0,
-        normalized=True,
-        max_variance=1,
-        positive=True,
+    d,
+    n_control=1000,
+    edges_per_d=2,
+    seed=0,
+    normalized=True,
+    max_variance=1,
+    positive=True,
 ):
     rng = np.random.RandomState(seed)
     graph = nx.gnp_random_graph(d, edges_per_d / (d - 1), directed=True, seed=seed)
@@ -185,9 +197,7 @@ def simulation(
     true_dag = nx.relabel_nodes(true_dag, {i: permutation[i] for i in range(d)})
 
     true_adjacency = nx.to_numpy_array(true_dag, nodelist=list(range(d)))
-    weights = true_adjacency * rng.uniform(
-        1, 3, true_adjacency.shape
-    )
+    weights = true_adjacency * rng.uniform(1, 3, true_adjacency.shape)
     if not positive:
         weights *= rng.choice([-1, 1], true_adjacency.shape)
     if normalized:
@@ -223,18 +233,20 @@ def worker(kwargs_):
 
 
 def compare_methods(n_jobs=1, **kwargs):
-    from itertools import product
     import multiprocessing
+    from itertools import product
 
     if n_jobs == 1:
-        scores = [worker(dict(zip(kwargs.keys(), kwargs_))) for kwargs_ in product(*kwargs.values())]
+        scores = [
+            worker(dict(zip(kwargs.keys(), kwargs_))) for kwargs_ in product(*kwargs.values())
+        ]
     else:
         with multiprocessing.Pool(n_jobs) as p:
             scores = p.map(
                 worker, [dict(zip(kwargs.keys(), kwargs_)) for kwargs_ in product(*kwargs.values())]
             )
     scores = pd.DataFrame(scores)
-    scores = scores[list(sorted(scores.columns))]
+    scores = scores[sorted(scores.columns)]
     return scores
 
 
@@ -523,7 +535,7 @@ def main():
     res.to_csv("results/benchmark-speed.csv", index=False)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # warmup jvm and R bridge
     _ = compare_methods(
         n_jobs=1,

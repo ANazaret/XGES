@@ -27,22 +27,24 @@ Author: Diviyan Kalainathan
 .. OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 .. SOFTWARE.
 """
+
 import os
 import uuid
 import warnings
-import networkx as nx
 from pathlib import Path
 from shutil import rmtree
 from tempfile import gettempdir
+
+import networkx as nx
 from cdt.causality.graph.model import GraphModel
-from pandas import DataFrame, read_csv
 from cdt.utils.R import RPackages, launch_R_script
 from cdt.utils.Settings import SETTINGS
+from pandas import DataFrame, read_csv
 
 
 def message_warning(msg, *a, **kwargs):
     """Ignore everything except the message."""
-    return str(msg) + '\n'
+    return str(msg) + "\n"
 
 
 warnings.formatwarning = message_warning
@@ -106,23 +108,24 @@ class GES(GraphModel):
         >>> plt.show()
     """
 
-    def __init__(self, score='obs', verbose=None):
+    def __init__(self, score="obs", verbose=None):
         """Init the model and its available arguments."""
         if not RPackages.pcalg:
             raise ImportError("R Package pcalg is not available.")
 
         super(GES, self).__init__()
-        self.scores = {'int': 'GaussL0penIntScore',
-                       'obs': 'GaussL0penObsScore'}
-        self.arguments = {'{FOLDER}': '/tmp/cdt_ges/',
-                          '{FILE}': os.sep + 'data.csv',
-                          '{SKELETON}': 'FALSE',
-                          '{GAPS}': os.sep + 'fixedgaps.csv',
-                          '{SCORE}': 'GaussL0penObsScore',
-                          '{ALPHA}': '1.0',  # added
-                          '{VERBOSE}': 'FALSE',
-                          '{PHASE}': 'c("forward", "backward", "turning")',  # added
-                          '{OUTPUT}': os.sep + 'result.csv'}
+        self.scores = {"int": "GaussL0penIntScore", "obs": "GaussL0penObsScore"}
+        self.arguments = {
+            "{FOLDER}": "/tmp/cdt_ges/",
+            "{FILE}": os.sep + "data.csv",
+            "{SKELETON}": "FALSE",
+            "{GAPS}": os.sep + "fixedgaps.csv",
+            "{SCORE}": "GaussL0penObsScore",
+            "{ALPHA}": "1.0",  # added
+            "{VERBOSE}": "FALSE",
+            "{PHASE}": 'c("forward", "backward", "turning")',  # added
+            "{OUTPUT}": os.sep + "result.csv",
+        }
         self.verbose = SETTINGS.get_default(verbose=verbose)
         self.score = score
 
@@ -138,16 +141,19 @@ class GES(GraphModel):
 
         """
         # Building setup w/ arguments.
-        self.arguments['{VERBOSE}'] = str(self.verbose).upper()
-        self.arguments['{SCORE}'] = self.scores[self.score]
+        self.arguments["{VERBOSE}"] = str(self.verbose).upper()
+        self.arguments["{SCORE}"] = self.scores[self.score]
 
-        fe = DataFrame(nx.adjacency_matrix(graph, nodelist=sorted(graph.nodes()), weight=None).todense())
+        fe = DataFrame(
+            nx.adjacency_matrix(graph, nodelist=sorted(graph.nodes()), weight=None).todense()
+        )
         fg = DataFrame(1 - fe.values)
 
         results = self._run_ges(data, fixedGaps=fg, verbose=self.verbose)
 
-        return nx.relabel_nodes(nx.DiGraph(results),
-                                {idx: i for idx, i in enumerate(sorted(data.columns))})
+        return nx.relabel_nodes(
+            nx.DiGraph(results), {idx: i for idx, i in enumerate(sorted(data.columns))}
+        )
 
     def orient_directed_graph(self, data, graph):
         """Run GES on a directed graph.
@@ -173,38 +179,47 @@ class GES(GraphModel):
 
         """
         # Building setup w/ arguments.
-        self.arguments['{SCORE}'] = self.scores[self.score]
-        self.arguments['{VERBOSE}'] = str(self.verbose).upper()
+        self.arguments["{SCORE}"] = self.scores[self.score]
+        self.arguments["{VERBOSE}"] = str(self.verbose).upper()
 
         results = self._run_ges(data, verbose=self.verbose, **kwargs)  # added
 
-        return nx.relabel_nodes(nx.DiGraph(results),
-                                {idx: i for idx, i in enumerate(data.columns)})
+        return nx.relabel_nodes(nx.DiGraph(results), {idx: i for idx, i in enumerate(data.columns)})
 
-    def _run_ges(self, data, fixedGaps=None, verbose=True, phases=("forward", "backward", "turning"), alpha=1.0):
+    def _run_ges(
+        self,
+        data,
+        fixedGaps=None,
+        verbose=True,
+        phases=("forward", "backward", "turning"),
+        alpha=1.0,
+    ):
         # achille added
         """Setting up and running ges with all arguments."""
         # Run GES
-        self.arguments['{FOLDER}'] = Path('{0!s}/cdt_ges_{1!s}/'.format(gettempdir(), uuid.uuid4()))
-        run_dir = self.arguments['{FOLDER}']
+        self.arguments["{FOLDER}"] = Path(f"{gettempdir()!s}/cdt_ges_{uuid.uuid4()!s}/")
+        run_dir = self.arguments["{FOLDER}"]
         os.makedirs(run_dir, exist_ok=True)
 
         def retrieve_result():
-            return read_csv(Path('{}/result.csv'.format(run_dir)), delimiter=',').values
+            return read_csv(Path(f"{run_dir}/result.csv"), delimiter=",").values
 
         try:
-            data.to_csv(Path('{}/data.csv'.format(run_dir)), header=False, index=False)
+            data.to_csv(Path(f"{run_dir}/data.csv"), header=False, index=False)
             if fixedGaps is not None:
-                fixedGaps.to_csv(Path('{}/fixedgaps.csv'.format(run_dir)), index=False, header=False)
-                self.arguments['{SKELETON}'] = 'TRUE'
+                fixedGaps.to_csv(Path(f"{run_dir}/fixedgaps.csv"), index=False, header=False)
+                self.arguments["{SKELETON}"] = "TRUE"
             else:
-                self.arguments['{SKELETON}'] = 'FALSE'
-            self.arguments['{PHASE}'] = "c(" + ", ".join(['"{}"'.format(i) for i in phases]) + ")"  # added
-            self.arguments['{ALPHA}'] = str(alpha)  # added
+                self.arguments["{SKELETON}"] = "FALSE"
+            self.arguments["{PHASE}"] = "c(" + ", ".join([f'"{i}"' for i in phases]) + ")"  # added
+            self.arguments["{ALPHA}"] = str(alpha)  # added
 
             ges_result = launch_R_script(
-                Path("{}/ges.R".format(os.path.dirname(os.path.realpath(__file__)))),
-                self.arguments, output_function=retrieve_result, verbose=verbose)
+                Path(f"{os.path.dirname(os.path.realpath(__file__))}/ges.R"),
+                self.arguments,
+                output_function=retrieve_result,
+                verbose=verbose,
+            )
         # Cleanup
         except Exception as e:
             rmtree(run_dir)

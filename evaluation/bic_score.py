@@ -121,7 +121,9 @@ class BICScorer:
         candidate_score = self.check_cache(cache_key)
         if candidate_score is None:
             # candidate_score = self.local_score(target, parents_with_candidate)
-            candidate_score = local_bic_fast(target, parents_with_candidate, self.n, self._cov, self.alpha)
+            candidate_score = local_bic_fast(
+                target, parents_with_candidate, self.n, self._cov, self.alpha
+            )
             self.set_cache(cache_key, candidate_score)
 
         return candidate_score - base_score
@@ -141,7 +143,9 @@ class BICScorer:
             if target in self.ignored_variables:
                 continue
             parents = list(dag.predecessors(target))
-            local_score = local_bic_fast(target, np.array(parents, dtype=int), self.n, self._cov, self.alpha)
+            local_score = local_bic_fast(
+                target, np.array(parents, dtype=int), self.n, self._cov, self.alpha
+            )
             score += local_score
 
         # score += self.d * (self.n + np.log(self.n)) / 2

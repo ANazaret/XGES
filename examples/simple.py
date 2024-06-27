@@ -27,10 +27,10 @@ model = XGES()
 model.fit(data)
 print("Chain:", model.get_pdag())
 
-## Get one possible DAG
+# Get one possible DAG
 print("Chain, one possible DAG:", model.get_a_dag())
 
-## Get the DAG as a networkx.DiGraph if networkx is installed
+# Get the DAG as a networkx.DiGraph if networkx is installed
 try:
     dag_nx = model.get_a_dag().to_networkx()
 
@@ -39,5 +39,5 @@ except ImportError:
     dag_nx = None
     print("networkx not installed.")
 
-## Get the adjacency matrix of the PDAG
+# Get the adjacency matrix of the PDAG
 print("Chain, adjacency matrix:", model.get_pdag().to_adjacency_matrix())
