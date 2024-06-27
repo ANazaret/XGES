@@ -136,7 +136,7 @@ class XGES:
         """
         Get the adjacency matrix of the graph.
         """
-        return self.pdag.get_adjacency_matrix()
+        return self.pdag.to_adjacency_matrix()
 
     def _initialize_from_data(
         self,
