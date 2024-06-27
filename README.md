@@ -14,9 +14,9 @@ In this repo, we provide:
     - examples of usage are available in `examples/simple.py`.
 - a pure c++ implementation of the algorithm in `src-cpp/`, which is at least ~10x faster
   than the python implementation (with `numba`).
-- code to reproduce the experiments in the paper in `evaluation/`.
-    - an ad-hoc python wrapper calling the cpp executable is available in `evaluation/benchmarks.py`.
-    - a notebook to generate the figures in the paper in `evaluation/paper.ipynb`.
+- code to reproduce the experiments in the paper in `paper_experiments/`.
+    - an ad-hoc python wrapper calling the cpp executable is available in `paper_experiments/benchmarks.py`.
+    - a notebook to generate the figures in the paper in `paper_experiments/paper.ipynb`.
 
 ## Using the python package
 
@@ -51,9 +51,9 @@ adjacency_dag = a_dag.to_adjacency_matrix()
 
 ## Reproducing the experiments
 
-The experiments can be reproduced by running the `evaluation/benchmarks.py`
+The experiments can be reproduced by running the `paper_experiments/benchmarks.py`
 script (after compiling the c++ code in `src-cpp`).
-The figures are generated in the notebook `evaluation/paper.ipynb`.
+The figures are generated in the notebook `paper_experiments/paper.ipynb`.
 
 ## Building the c++ code
 
