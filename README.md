@@ -10,10 +10,10 @@ The algorithm is described in the paper "Extremely Greedy Equivalence Search" (s
 In this repo, we provide:
 
 - a pure python implementation of the algorithm in `xges/` available with `pip install xges`.
-    - it can optionally use `numba` for faster execution.
+    - it can use `numba` for faster execution if the package is installed.
     - examples of usage are available in `examples/simple.py`.
 - a pure c++ implementation of the algorithm in `src-cpp/`, which is at least ~10x faster
-  than the python implementation (with `numba`).
+  than the python implementation.
 - code to reproduce the experiments in the paper in `paper_experiments/`.
     - an ad-hoc python wrapper calling the cpp executable is available in `paper_experiments/benchmarks.py`.
     - a notebook to generate the figures in the paper in `paper_experiments/paper.ipynb`.
